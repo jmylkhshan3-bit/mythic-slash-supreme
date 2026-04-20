@@ -16,7 +16,7 @@ class PresenceManager:
     def set_mode(self, mode: str) -> None:
         self.mode = mode if mode in MODE_PRESETS else 'normal'
 
-    @tasks.loop(seconds=35)
+    @tasks.loop(seconds=45)
     async def rotate(self) -> None:
         preset = MODE_PRESETS.get(self.mode, MODE_PRESETS['normal'])
         line = random.choice(preset.presence_lines)

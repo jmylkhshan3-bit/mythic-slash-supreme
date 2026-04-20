@@ -6,42 +6,32 @@ import discord
 
 
 class AssetManager:
-    def __init__(self, internal_root: Path, external_root: Path | None = None) -> None:
+    def __init__(self, internal_root: Path, external_root: Path | None) -> None:
         self.internal_root = internal_root
         self.external_root = external_root
 
-    def _roots(self) -> list[Path]:
-        roots: list[Path] = []
-        if self.external_root:
-            roots.append(self.external_root)
-        roots.append(self.internal_root)
+    def _roots(self) -> list[tuple[str, Path]]:
+        roots: list[tuple[str, Path]] = []
+        if self.external_root and self.external_root.exists():
+            roots.append(('external', self.external_root))
+        if self.internal_root.exists():
+            roots.append(('internal', self.internal_root))
         return roots
 
-    def _candidate_paths(self, root: Path, kind: str) -> list[Path]:
-        if kind == 'avatar':
-            return [
-                root / 'brand' / 'bot_avatar_1024.png',
-                root / 'bot_ui' / 'brand' / 'bot_avatar_1024.png',
-            ]
-        if kind == 'banner':
-            return [
-                root / 'brand' / 'bot_banner_680x240.png',
-                root / 'bot_ui' / 'brand' / 'bot_banner_680x240.png',
-            ]
-        return []
-
-    def _find_file(self, kind: str) -> Path | None:
-        for root in self._roots():
-            for path in self._candidate_paths(root, kind):
-                if path.exists():
-                    return path
+    def _find(self, *parts: str) -> tuple[str, Path] | None:
+        for source, root in self._roots():
+            path = root.joinpath(*parts)
+            if path.exists():
+                return source, path
         return None
 
     def avatar_path(self) -> Path | None:
-        return self._find_file('avatar')
+        found = self._find('brand', 'bot_avatar_1024.png')
+        return found[1] if found else None
 
     def banner_path(self) -> Path | None:
-        return self._find_file('banner')
+        found = self._find('brand', 'bot_banner_680x240.png')
+        return found[1] if found else None
 
     def avatar_file(self) -> discord.File | None:
         path = self.avatar_path()
@@ -52,19 +42,28 @@ class AssetManager:
         return discord.File(path, filename='bot_banner_680x240.png') if path else None
 
     def icon_names(self) -> list[str]:
-        names: set[str] = set()
-        for root in self._roots():
-            for icon_dir in (root / 'icons', root / 'svg' / 'icons', root / 'bot_ui' / 'icons'):
-                if icon_dir.exists():
-                    names.update(p.name for p in icon_dir.glob('*.svg'))
-        return sorted(names)
+        for _, root in self._roots():
+            icon_dir = root / 'icons'
+            if icon_dir.exists():
+                return sorted(p.name for p in icon_dir.glob('*.svg'))
+            alt_icon_dir = root / 'svg' / 'icons'
+            if alt_icon_dir.exists():
+                return sorted(p.name for p in alt_icon_dir.glob('*.svg'))
+        return []
 
     def asset_status(self) -> dict[str, str]:
-        active_root = self.external_root if self.external_root and self.external_root.exists() else self.internal_root
+        source = 'missing'
+        root = 'not set'
+        if self.external_root and self.external_root.exists():
+            source = 'external'
+            root = str(self.external_root)
+        elif self.internal_root.exists():
+            source = 'internal'
+            root = str(self.internal_root)
         return {
-            'root': str(active_root),
+            'source': source,
+            'root': root,
             'avatar': 'found' if self.avatar_path() else 'missing',
             'banner': 'found' if self.banner_path() else 'missing',
             'icons': f'{len(self.icon_names())} file(s)',
-            'source': 'external + internal fallback' if self.external_root else 'internal bundled bot_ui assets',
         }

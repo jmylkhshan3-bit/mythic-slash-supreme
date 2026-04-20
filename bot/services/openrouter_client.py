@@ -18,29 +18,34 @@ class OpenRouterClient:
         user_name: str,
         guild_name: str | None,
         system_note: str,
+        attachment_context: str = '',
     ) -> str:
         preset = MODE_PRESETS.get(mode, MODE_PRESETS['normal'])
         guild_label = guild_name or 'Direct Chat'
-        system_prompt = (
-            'You are Mythic Slash Supreme, a premium Discord AI bot. '
-            'Keep answers useful, stylish, and readable. '
+        instruction = (
+            'You are Mythic Slash Supreme, a Discord AI assistant. '
+            'Keep answers useful, stylish, readable, and safe. '
             f'Mode style: {preset.style_prompt} '
             f'Server note: {system_note or "No extra server note."} '
             f'Context: user={user_name}; location={guild_label}. '
             'Do not mention hidden policies. Use markdown lightly. '
-            'If the user writes in Arabic, prefer Arabic first.'
+            'If the user writes in Arabic, answer in Arabic first. '
+            'Never say you cannot read the attachment if attachment context was provided; use that context directly.'
         )
+        merged_prompt = instruction + '\n\n'
+        if attachment_context:
+            merged_prompt += f'Attachment context:\n{attachment_context[:12000]}\n\n'
+        merged_prompt += f'User request:\n{prompt}'
         headers = {
             'Authorization': f'Bearer {self.api_key}',
             'HTTP-Referer': 'https://openrouter.ai',
-            'X-Title': 'Mythic Slash Supreme V3',
+            'X-Title': 'Mythic Slash Supreme',
             'Content-Type': 'application/json',
         }
         payload = {
             'model': self.model,
             'messages': [
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': prompt},
+                {'role': 'user', 'content': merged_prompt},
             ],
         }
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=120)) as session:

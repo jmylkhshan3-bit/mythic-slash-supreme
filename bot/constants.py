@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-BOT_VERSION = '3.0.0'
-SPINNER_FRAMES = ['◐', '◓', '◑', '◒', '✦', '✧']
-PROGRESS_STEPS = 12
+BOT_VERSION = '2.0.0'
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,7 +14,6 @@ class ModePreset:
     style_prompt: str
     loading_lines: list[str]
     presence_lines: list[str]
-    status_label: str
 
 
 MODE_PRESETS: dict[str, ModePreset] = {
@@ -25,8 +22,7 @@ MODE_PRESETS: dict[str, ModePreset] = {
         label='Normal',
         emoji='⚡',
         color=0x4CC9F0,
-        style_prompt='Balanced, useful, clear, and direct.',
-        status_label='stable',
+        style_prompt='Balanced, helpful, clean, and practical.',
         loading_lines=[
             'Stabilizing the reply lane...', 'Reading the message pulse...', 'Scanning the request...', 'Aligning response blocks...',
             'Cooling the latency core...', 'Opening the answer channel...', 'Building a precise reply...', 'Calibrating clarity...',
@@ -46,8 +42,7 @@ MODE_PRESETS: dict[str, ModePreset] = {
         label='Thinking',
         emoji='🧠',
         color=0x8D99AE,
-        style_prompt='Reflective, analytical, and step-aware without exposing hidden reasoning.',
-        status_label='deep focus',
+        style_prompt='More reflective, step-aware, and analytical without exposing hidden reasoning.',
         loading_lines=[
             'Thinking mode is mapping the question...', 'Reviewing hidden edges...', 'Tracing the best route...', 'Comparing possible answers...',
             'Checking assumptions...', 'Rebuilding the answer tree...', 'Ranking response paths...', 'Thinking mode is sharpening logic...',
@@ -67,8 +62,7 @@ MODE_PRESETS: dict[str, ModePreset] = {
         label='Dev',
         emoji='🛠️',
         color=0x4361EE,
-        style_prompt='Technical, implementation-oriented, code-first, and structured.',
-        status_label='build mode',
+        style_prompt='More technical, implementation-oriented, with code-first instincts.',
         loading_lines=[
             'Dev mode is porting ideas...', 'Reading the stack trace in spirit...', 'Compiling a cleaner answer...', 'Linting the wording...',
             'Checking implementation gaps...', 'Mapping function flow...', 'Reviewing edge cases...', 'Drafting the technical response...',
@@ -88,8 +82,7 @@ MODE_PRESETS: dict[str, ModePreset] = {
         label='God',
         emoji='👑',
         color=0xF4A261,
-        style_prompt='Confident, premium, cinematic, high-energy, and decisive.',
-        status_label='legendary',
+        style_prompt='Confident, premium, decisive, cinematic, and high-energy.',
         loading_lines=[
             'God mode is charging the throne...', 'Summoning a premium-grade answer...', 'Bending the reply space...', 'Elevating the response tier...',
             'Power-routing the output...', 'Infusing cinematic confidence...', 'Polishing the royal answer...', 'Locking the grand delivery...',
@@ -110,7 +103,6 @@ MODE_PRESETS: dict[str, ModePreset] = {
         emoji='🎨',
         color=0xD16BA5,
         style_prompt='Expressive, imaginative, stylish, and idea-rich.',
-        status_label='vivid',
         loading_lines=[
             'Creative mode is opening the color vault...', 'Sketching stronger ideas...', 'Blending style with clarity...', 'Painting the reply...',
             'Mixing vivid concepts...', 'Turning sparks into structure...', 'Inventing a cleaner angle...', 'Arranging the creative flow...',
@@ -131,7 +123,6 @@ MODE_PRESETS: dict[str, ModePreset] = {
         emoji='📊',
         color=0x2A9D8F,
         style_prompt='Structured, evidence-minded, comparative, and concise.',
-        status_label='precision',
         loading_lines=[
             'Analyst mode is structuring the data...', 'Breaking the request into layers...', 'Sorting facts from noise...', 'Comparing answer candidates...',
             'Building a clean framework...', 'Testing the strongest outline...', 'Reducing clutter...', 'Reading signal density...',
