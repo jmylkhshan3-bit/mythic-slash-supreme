@@ -1,0 +1,50 @@
+name: Run tests
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  run-tests:
+    strategy:
+      matrix:
+        vars:
+          [
+            { os: ubuntu-24.04, platform: linux/amd64 },
+            { os: ubuntu-24.04-arm, platform: linux/arm64 },
+          ]
+
+    name: Run tests
+    runs-on: ${{ matrix.vars.os }}
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Docker buildx for multi-architecture builds
+        uses: docker/setup-buildx-action@v3
+        with:
+          use: true
+
+      - name: Build the Docker image
+        run: >
+          docker buildx build
+          --load
+          --platform ${{ matrix.vars.platform }}
+          --tag kokoro-web:latest
+          --file docker/Dockerfile.dev .
+
+      - name: Run tests
+        run: >
+          docker run --rm -v $PWD:/app kokoro-web:latest /bin/bash -c "
+            cd /app &&
+            npm install &&
+            npm run test
+          "

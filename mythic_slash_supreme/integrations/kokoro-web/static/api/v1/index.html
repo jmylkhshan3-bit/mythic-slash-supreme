@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="description" content="SwaggerUI" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/favicon.ico" />
+    <title>Kokoro Web - SwaggerUI</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css"
+    />
+    <script
+      src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js"
+      crossorigin
+    ></script>
+  </head>
+  <body>
+    <div id="swagger-ui"></div>
+    <script>
+      window.onload = () => {
+        window.ui = SwaggerUIBundle({
+          url: "/api/v1/openapi.json",
+          dom_id: "#swagger-ui",
+        });
+      };
+    </script>
+  </body>
+</html>
