@@ -21,6 +21,11 @@ class Settings:
     activation_phrase: str
     tts_voice_ar: str
     tts_voice_en: str
+    tts_provider: str
+    tts_api_key: str
+    tts_api_base: str
+    tts_api_model: str
+    tts_api_voice: str
     voice_silence_seconds: float
     voice_trigger_level_db: float
     enable_experimental_voice_recv: bool
@@ -31,12 +36,14 @@ class Settings:
         load_dotenv(dotenv_path=project_root / '.env')
         assets_raw = os.getenv('EXTERNAL_ASSETS_DIR', '').strip()
         assets_path = Path(assets_raw).expanduser().resolve() if assets_raw else None
+
         def _to_float(name: str, default: float) -> float:
             raw = os.getenv(name, str(default)).strip()
             try:
                 return float(raw)
             except ValueError:
                 return default
+
         return cls(
             discord_token=os.getenv('DISCORD_TOKEN', '').strip(),
             openrouter_api_key=os.getenv('OPENROUTER_API_KEY', '').strip(),
@@ -50,6 +57,11 @@ class Settings:
             activation_phrase=os.getenv('ACTIVATION_PHRASE', 'hey m').strip().lower(),
             tts_voice_ar=os.getenv('TTS_VOICE_AR', 'ar-SA-HamedNeural').strip(),
             tts_voice_en=os.getenv('TTS_VOICE_EN', 'en-US-AndrewNeural').strip(),
+            tts_provider=os.getenv('TTS_PROVIDER', 'edge').strip().lower(),
+            tts_api_key=os.getenv('TTS_API_KEY', '').strip(),
+            tts_api_base=os.getenv('TTS_API_BASE', '').strip(),
+            tts_api_model=os.getenv('TTS_API_MODEL', 'tts-1').strip(),
+            tts_api_voice=os.getenv('TTS_API_VOICE', 'alloy').strip(),
             voice_silence_seconds=_to_float('VOICE_SILENCE_SECONDS', 2.0),
             voice_trigger_level_db=_to_float('VOICE_TRIGGER_LEVEL_DB', -42.0),
             enable_experimental_voice_recv=os.getenv('ENABLE_EXPERIMENTAL_VOICE_RECV', 'true').strip().lower() in {'1', 'true', 'yes', 'on'},

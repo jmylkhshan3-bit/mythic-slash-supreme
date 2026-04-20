@@ -234,24 +234,15 @@ class MythicCog(commands.Cog):
         return await self.voice_runtime.connect_or_move(interaction)
 
     async def _play_tts(self, interaction: discord.Interaction, text: str) -> str:
-        vc = await self._ensure_voice_connection(interaction)
-        if vc.is_playing():
-            vc.stop()
-        snapshot = self.state.get(interaction.guild.id if interaction.guild else None)
+        guild = interaction.guild
+        if guild is None:
+            raise RuntimeError('Voice speak works only inside a server.')
+        await self._ensure_voice_connection(interaction)
+        snapshot = self.state.get(guild.id)
         preferred = snapshot.get('voice_output_language', 'auto')
         if preferred not in {'ar', 'en'}:
             preferred = None
-        audio_path = await self.tts.synthesize(text, preferred=preferred)
-        source = discord.FFmpegPCMAudio(str(audio_path))
-        def _after(exc: Exception | None) -> None:
-            try:
-                audio_path.unlink(missing_ok=True)
-            except Exception:
-                pass
-            if exc:
-                log.error('Voice playback error: %s', exc)
-        vc.play(source, after=_after)
-        return vc.channel.name if vc.channel else 'voice'
+        return await self.voice_runtime.speak_text(guild, text, preferred_language=preferred)
 
     async def handle_voice_action(self, interaction: discord.Interaction, *, action: str, text: str | None) -> None:
         if not interaction.response.is_done():
@@ -303,7 +294,7 @@ class MythicCog(commands.Cog):
         if not interaction.response.is_done():
             await interaction.response.defer(ephemeral=True, thinking=True)
         try:
-            note = await self.voice_runtime.arm(interaction.guild)
+            note = await self.voice_runtime.arm(interaction.guild, text_channel_id=interaction.channel_id)
             state = self.state.set_voice_armed(interaction.guild.id, True)
             await interaction.followup.send(
                 note,
@@ -517,6 +508,20 @@ class MythicCog(commands.Cog):
             files=self.brand_files(),
             ephemeral=True,
         )
+
+
+    @app_commands.command(name='speak', description='Speak text in the current voice channel.')
+    @app_commands.describe(text='Text for the bot to speak in voice')
+    async def speak(self, interaction: discord.Interaction, text: str) -> None:
+        await self.handle_voice_action(interaction, action='speak', text=text)
+
+    @app_commands.command(name='voice_join', description='Join your current voice channel.')
+    async def voice_join(self, interaction: discord.Interaction) -> None:
+        await self.handle_voice_action(interaction, action='join', text=None)
+
+    @app_commands.command(name='voice_leave', description='Leave the current voice channel.')
+    async def voice_leave(self, interaction: discord.Interaction) -> None:
+        await self.handle_voice_action(interaction, action='leave', text=None)
 
     @app_commands.command(name='transcribe', description='Transcribe an attached audio or video file with AssemblyAI.')
     @app_commands.describe(file='Audio or video attachment to transcribe')

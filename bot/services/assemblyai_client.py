@@ -32,6 +32,8 @@ class AssemblyAIClient:
         data: bytes,
         speaker_labels: bool = False,
         language_detection: bool = True,
+        language_code: str | None = None,
+        expected_languages: list[str] | None = None,
         timeout_seconds: int = 180,
     ) -> TranscriptResult:
         if not self.enabled:
@@ -47,11 +49,20 @@ class AssemblyAIClient:
                 if upload_response.status >= 400:
                     raise RuntimeError(f'AssemblyAI upload failed {upload_response.status}: {upload_text[:500]}')
                 upload_json = await upload_response.json()
-            transcript_payload = {
+            transcript_payload: dict[str, object] = {
                 'audio_url': upload_json['upload_url'],
                 'speaker_labels': speaker_labels,
-                'language_detection': language_detection,
             }
+            if language_code:
+                transcript_payload['language_code'] = language_code
+                transcript_payload['language_detection'] = False
+            else:
+                transcript_payload['language_detection'] = language_detection
+                if language_detection and expected_languages:
+                    transcript_payload['language_detection_options'] = {
+                        'expected_languages': expected_languages,
+                        'fallback_language': 'auto',
+                    }
             async with session.post(
                 f'{self.base_url}/v2/transcript',
                 headers={**self._headers(), 'Content-Type': 'application/json'},

@@ -31,10 +31,25 @@ class MythicBot(commands.Bot):
         self.state_manager = GuildStateManager(Path('data/guild_state.json'))
         self.openrouter_client = OpenRouterClient(settings.openrouter_api_key, settings.openrouter_model)
         self.assemblyai_client = AssemblyAIClient(settings.assemblyai_api_key)
-        self.tts_service = TTSService(voice_ar=settings.tts_voice_ar, voice_en=settings.tts_voice_en)
+        self.tts_service = TTSService(
+            voice_ar=settings.tts_voice_ar,
+            voice_en=settings.tts_voice_en,
+            provider=settings.tts_provider,
+            api_key=settings.tts_api_key,
+            api_base=settings.tts_api_base,
+            api_model=settings.tts_api_model,
+            api_voice=settings.tts_api_voice,
+        )
         self.asset_manager = AssetManager(settings.internal_assets_dir, settings.external_assets_dir)
         self.presence_manager = PresenceManager(self, settings.default_mode)
-        self.voice_runtime = VoiceRuntimeManager(settings)
+        self.voice_runtime = VoiceRuntimeManager(
+            bot=self,
+            settings=settings,
+            state_manager=self.state_manager,
+            openrouter_client=self.openrouter_client,
+            assemblyai_client=self.assemblyai_client,
+            tts_service=self.tts_service,
+        )
 
     async def setup_hook(self) -> None:
         await self.load_extension('bot.cogs.mythic')
