@@ -9,7 +9,8 @@ from discord.ext import commands
 from bot.config import Settings
 from bot.logger import setup_logging
 from bot.services.assets import AssetManager
-from bot.services.assemblyai_client import AssemblyAIClient
+from bot.services.elevenlabs_client import ElevenLabsClient
+from bot.services.music_service import MusicManager
 from bot.services.openrouter_client import OpenRouterClient
 from bot.services.status_manager import PresenceManager
 from bot.services.tts_service import TTSService
@@ -30,25 +31,26 @@ class MythicBot(commands.Bot):
         self.settings = settings
         self.state_manager = GuildStateManager(Path('data/guild_state.json'))
         self.openrouter_client = OpenRouterClient(settings.openrouter_api_key, settings.openrouter_model)
-        self.assemblyai_client = AssemblyAIClient(settings.assemblyai_api_key)
-        self.tts_service = TTSService(
-            voice_ar=settings.tts_voice_ar,
-            voice_en=settings.tts_voice_en,
-            provider=settings.tts_provider,
-            api_key=settings.tts_api_key,
-            api_base=settings.tts_api_base,
-            api_model=settings.tts_api_model,
-            api_voice=settings.tts_api_voice,
+        self.elevenlabs_client = ElevenLabsClient(
+            settings.elevenlabs_api_key,
+            settings.elevenlabs_voice_id,
+            settings.elevenlabs_tts_model_id,
+            settings.elevenlabs_stt_model_id,
+            en_voice_id=settings.elevenlabs_en_voice_id,
+            ar_voice_id=settings.elevenlabs_ar_voice_id,
         )
+        self.tts_service = TTSService(elevenlabs_client=self.elevenlabs_client)
         self.asset_manager = AssetManager(settings.internal_assets_dir, settings.external_assets_dir)
         self.presence_manager = PresenceManager(self, settings.default_mode)
+        self.music_manager = MusicManager(self.state_manager, self)
         self.voice_runtime = VoiceRuntimeManager(
             bot=self,
             settings=settings,
             state_manager=self.state_manager,
             openrouter_client=self.openrouter_client,
-            assemblyai_client=self.assemblyai_client,
+            elevenlabs_client=self.elevenlabs_client,
             tts_service=self.tts_service,
+            music_manager=self.music_manager,
         )
 
     async def setup_hook(self) -> None:
@@ -65,13 +67,13 @@ class MythicBot(commands.Bot):
             else:
                 log.info('Mention replies are disabled.')
             if self.voice_runtime.receive_supported:
-                log.info('Experimental voice receive backend is available for the official bot runtime.')
+                log.info('Wake-word voice capture backend is available.')
             else:
-                log.info('Experimental voice receive backend is not available; voice runtime remains in compatibility mode.')
+                log.info('Wake-word voice capture backend is not available in this runtime.')
 
     async def on_command_error(self, context: commands.Context, exception: commands.CommandError) -> None:
         if isinstance(exception, commands.CommandNotFound):
-            log.debug('Ignored message command parser miss for content: %s', context.message.content[:120] if context.message else '')
+            log.debug('Ignored legacy message command miss for: %s', context.message.content[:120] if context.message else '')
             return
         await super().on_command_error(context, exception)
 
@@ -83,6 +85,8 @@ async def run_bot() -> None:
         raise RuntimeError('DISCORD_TOKEN is missing. Fill .env first.')
     if not settings.openrouter_api_key:
         raise RuntimeError('OPENROUTER_API_KEY is missing. Fill .env first.')
+    if not settings.elevenlabs_api_key:
+        raise RuntimeError('ELEVENLABS_API_KEY is missing. Fill .env first.')
     bot = MythicBot(settings)
     async with bot:
         await bot.start(settings.discord_token)

@@ -9,14 +9,12 @@ DEFAULT_GUILD_STATE = {
     'mention_enabled': True,
     'allowed_channel_ids': [],
     'system_note': '',
-    'voice_armed': False,
     'voice_input_language': 'auto',
     'voice_output_language': 'auto',
-    'voice_silence_seconds': 2.0,
-    'voice_trigger_level_db': -42.0,
+    'voice_silence_seconds': 5.0,
+    'voice_trigger_level_db': -55.0,
     'voice_wake_phrase': 'hey m',
-    'voice_reply_mode': 'voice+text',
-    'voice_architecture': 'official-bot',
+    'music_loop': False,
 }
 
 
@@ -80,9 +78,6 @@ class GuildStateManager:
     def set_system_note(self, guild_id: int, note: str) -> dict:
         return self._update(guild_id, system_note=note.strip())
 
-    def set_voice_armed(self, guild_id: int, armed: bool) -> dict:
-        return self._update(guild_id, voice_armed=armed)
-
     def set_voice_profile(
         self,
         guild_id: int,
@@ -92,7 +87,6 @@ class GuildStateManager:
         output_language: str | None = None,
         silence_seconds: float | None = None,
         trigger_level_db: float | None = None,
-        reply_mode: str | None = None,
     ) -> dict:
         patch: dict[str, object] = {}
         if wake_phrase is not None:
@@ -102,9 +96,10 @@ class GuildStateManager:
         if output_language is not None:
             patch['voice_output_language'] = output_language.strip().lower() or 'auto'
         if silence_seconds is not None:
-            patch['voice_silence_seconds'] = max(0.5, float(silence_seconds))
+            patch['voice_silence_seconds'] = max(0.8, float(silence_seconds))
         if trigger_level_db is not None:
             patch['voice_trigger_level_db'] = float(trigger_level_db)
-        if reply_mode is not None:
-            patch['voice_reply_mode'] = reply_mode.strip().lower() or 'voice+text'
         return self._update(guild_id, **patch)
+
+    def set_music_loop(self, guild_id: int, enabled: bool) -> dict:
+        return self._update(guild_id, music_loop=bool(enabled))

@@ -12,20 +12,18 @@ class Settings:
     discord_token: str
     openrouter_api_key: str
     openrouter_model: str
-    assemblyai_api_key: str
+    elevenlabs_api_key: str
+    elevenlabs_voice_id: str
+    elevenlabs_en_voice_id: str
+    elevenlabs_ar_voice_id: str
+    elevenlabs_tts_model_id: str
+    elevenlabs_stt_model_id: str
     external_assets_dir: Path | None
     internal_assets_dir: Path
     default_mode: str
     log_level: str
     enable_mention_reply: bool
     activation_phrase: str
-    tts_voice_ar: str
-    tts_voice_en: str
-    tts_provider: str
-    tts_api_key: str
-    tts_api_base: str
-    tts_api_model: str
-    tts_api_voice: str
     voice_silence_seconds: float
     voice_trigger_level_db: float
     enable_experimental_voice_recv: bool
@@ -44,25 +42,25 @@ class Settings:
             except ValueError:
                 return default
 
+        default_voice = os.getenv('ELEVENLABS_VOICE_ID', 'JBFqnCBsd6RMkjVDRZzb').strip()
+
         return cls(
             discord_token=os.getenv('DISCORD_TOKEN', '').strip(),
             openrouter_api_key=os.getenv('OPENROUTER_API_KEY', '').strip(),
             openrouter_model=os.getenv('OPENROUTER_MODEL', 'openrouter/free').strip(),
-            assemblyai_api_key=os.getenv('ASSEMBLYAI_API_KEY', '').strip(),
+            elevenlabs_api_key=os.getenv('ELEVENLABS_API_KEY', '').strip(),
+            elevenlabs_voice_id=default_voice,
+            elevenlabs_en_voice_id=os.getenv('ELEVENLABS_EN_VOICE_ID', default_voice).strip() or default_voice,
+            elevenlabs_ar_voice_id=os.getenv('ELEVENLABS_AR_VOICE_ID', default_voice).strip() or default_voice,
+            elevenlabs_tts_model_id=os.getenv('ELEVENLABS_TTS_MODEL_ID', 'eleven_flash_v2_5').strip(),
+            elevenlabs_stt_model_id=os.getenv('ELEVENLABS_STT_MODEL_ID', 'scribe_v2').strip(),
             external_assets_dir=assets_path,
             internal_assets_dir=project_root / 'bot_ui',
             default_mode=os.getenv('DEFAULT_MODE', 'normal').strip().lower(),
             log_level=os.getenv('LOG_LEVEL', 'INFO').strip().upper(),
             enable_mention_reply=os.getenv('ENABLE_MENTION_REPLY', 'true').strip().lower() in {'1', 'true', 'yes', 'on'},
             activation_phrase=os.getenv('ACTIVATION_PHRASE', 'hey m').strip().lower(),
-            tts_voice_ar=os.getenv('TTS_VOICE_AR', 'ar-SA-HamedNeural').strip(),
-            tts_voice_en=os.getenv('TTS_VOICE_EN', 'en-US-AndrewNeural').strip(),
-            tts_provider=os.getenv('TTS_PROVIDER', 'edge').strip().lower(),
-            tts_api_key=os.getenv('TTS_API_KEY', '').strip(),
-            tts_api_base=os.getenv('TTS_API_BASE', '').strip(),
-            tts_api_model=os.getenv('TTS_API_MODEL', 'tts-1').strip(),
-            tts_api_voice=os.getenv('TTS_API_VOICE', 'alloy').strip(),
-            voice_silence_seconds=_to_float('VOICE_SILENCE_SECONDS', 2.0),
-            voice_trigger_level_db=_to_float('VOICE_TRIGGER_LEVEL_DB', -42.0),
+            voice_silence_seconds=_to_float('VOICE_SILENCE_SECONDS', 5.0),
+            voice_trigger_level_db=_to_float('VOICE_TRIGGER_LEVEL_DB', -55.0),
             enable_experimental_voice_recv=os.getenv('ENABLE_EXPERIMENTAL_VOICE_RECV', 'true').strip().lower() in {'1', 'true', 'yes', 'on'},
         )

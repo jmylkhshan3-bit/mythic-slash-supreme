@@ -7,7 +7,7 @@ class SystemNoteModal(discord.ui.Modal, title='Mythic Server Note'):
     note = discord.ui.TextInput(
         label='Server note',
         style=discord.TextStyle.paragraph,
-        placeholder='Example: Answer in Arabic first, keep replies concise, and use bullet points rarely.',
+        placeholder='Example: Keep answers concise, professional, and helpful.',
         max_length=600,
         required=False,
     )
@@ -50,11 +50,11 @@ class QuickAskModal(discord.ui.Modal, title='Ask Mythic'):
         )
 
 
-class VoiceSpeakModal(discord.ui.Modal, title='Speak in Voice'):
+class SpeakModal(discord.ui.Modal, title='Speak with Mythic'):
     text = discord.ui.TextInput(
         label='Text to speak',
         style=discord.TextStyle.paragraph,
-        placeholder='Type the text the bot should speak inside voice...',
+        placeholder='Type what the bot should say in voice...',
         max_length=1500,
         required=True,
     )
@@ -64,10 +64,10 @@ class VoiceSpeakModal(discord.ui.Modal, title='Speak in Voice'):
         self.cog = cog
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
-        await self.cog.handle_voice_action(interaction, action='speak', text=str(self.text.value))
+        await self.cog.handle_speak(interaction, str(self.text.value))
 
 
-class VoiceSettingsModal(discord.ui.Modal, title='Official Voice Runtime'):
+class VoiceSettingsModal(discord.ui.Modal, title='Voice Capture Settings'):
     wake_phrase = discord.ui.TextInput(
         label='Wake phrase',
         placeholder='hey m',
@@ -77,22 +77,29 @@ class VoiceSettingsModal(discord.ui.Modal, title='Official Voice Runtime'):
     )
     input_language = discord.ui.TextInput(
         label='Input language',
-        placeholder='auto / ar / en',
+        placeholder='auto / en / ar',
         default='auto',
         required=True,
         max_length=10,
     )
     output_language = discord.ui.TextInput(
-        label='Output language',
-        placeholder='auto / ar / en',
+        label='Reply language',
+        placeholder='auto / en / ar',
         default='auto',
         required=True,
         max_length=10,
     )
     silence_seconds = discord.ui.TextInput(
         label='Silence seconds',
-        placeholder='2.0',
-        default='2.0',
+        placeholder='5.0',
+        default='5.0',
+        required=True,
+        max_length=8,
+    )
+    trigger_level = discord.ui.TextInput(
+        label='Trigger level dB',
+        placeholder='-55.0',
+        default='-55.0',
         required=True,
         max_length=8,
     )
@@ -103,7 +110,8 @@ class VoiceSettingsModal(discord.ui.Modal, title='Official Voice Runtime'):
         self.wake_phrase.default = str(state.get('voice_wake_phrase', 'hey m'))
         self.input_language.default = str(state.get('voice_input_language', 'auto'))
         self.output_language.default = str(state.get('voice_output_language', 'auto'))
-        self.silence_seconds.default = str(state.get('voice_silence_seconds', 2.0))
+        self.silence_seconds.default = str(state.get('voice_silence_seconds', 5.0))
+        self.trigger_level.default = str(state.get('voice_trigger_level_db', -55.0))
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
@@ -111,8 +119,9 @@ class VoiceSettingsModal(discord.ui.Modal, title='Official Voice Runtime'):
             return
         try:
             silence = float(str(self.silence_seconds.value).strip())
+            trigger_level = float(str(self.trigger_level.value).strip())
         except ValueError:
-            await interaction.response.send_message('Silence seconds must be a number like 2.0.', ephemeral=True)
+            await interaction.response.send_message('Silence seconds and trigger level must be numeric values.', ephemeral=True)
             return
         state = self.cog.state.set_voice_profile(
             interaction.guild.id,
@@ -120,10 +129,10 @@ class VoiceSettingsModal(discord.ui.Modal, title='Official Voice Runtime'):
             input_language=str(self.input_language.value),
             output_language=str(self.output_language.value),
             silence_seconds=silence,
+            trigger_level_db=trigger_level,
         )
         await interaction.response.send_message(
-            embed=self.cog.build_voice_hub_embed(interaction.guild.id, state_override=state),
+            embed=self.cog.build_status_embed(interaction.guild.id, state_override=state),
             files=self.cog.brand_files(),
             ephemeral=True,
-            view=self.cog.voice_hub_view(interaction.guild.id),
         )

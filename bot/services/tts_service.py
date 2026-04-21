@@ -1,74 +1,20 @@
 from __future__ import annotations
 
-import re
 import tempfile
 from pathlib import Path
 
-import aiohttp
-import edge_tts
-
-
-_ARABIC_RE = re.compile(r'[\u0600-\u06FF]')
+from bot.services.elevenlabs_client import ElevenLabsClient
 
 
 class TTSService:
-    def __init__(
-        self,
-        *,
-        voice_ar: str,
-        voice_en: str,
-        provider: str = 'edge',
-        api_key: str = '',
-        api_base: str = '',
-        api_model: str = 'tts-1',
-        api_voice: str = 'alloy',
-    ) -> None:
-        self.voice_ar = voice_ar
-        self.voice_en = voice_en
-        self.provider = provider.strip().lower() or 'edge'
-        self.api_key = api_key.strip()
-        self.api_base = api_base.rstrip('/')
-        self.api_model = api_model.strip() or 'tts-1'
-        self.api_voice = api_voice.strip() or 'alloy'
-
-    def pick_voice(self, text: str, preferred: str | None = None) -> str:
-        if preferred == 'ar':
-            return self.voice_ar
-        if preferred == 'en':
-            return self.voice_en
-        return self.voice_ar if _ARABIC_RE.search(text or '') else self.voice_en
+    def __init__(self, *, elevenlabs_client: ElevenLabsClient) -> None:
+        self.client = elevenlabs_client
 
     async def synthesize(self, text: str, *, preferred: str | None = None) -> Path:
-        if self.provider == 'openai_compatible' and self.api_key and self.api_base:
-            return await self._synthesize_openai_compatible(text, preferred=preferred)
-        return await self._synthesize_edge(text, preferred=preferred)
-
-    async def _synthesize_edge(self, text: str, *, preferred: str | None = None) -> Path:
-        voice = self.pick_voice(text, preferred=preferred)
+        audio = await self.client.text_to_speech(text=text, preferred_language=preferred)
         fd, tmp_path = tempfile.mkstemp(prefix='mythic_tts_', suffix='.mp3')
-        Path(tmp_path).unlink(missing_ok=True)
-        await edge_tts.Communicate(text, voice=voice).save(tmp_path)
-        return Path(tmp_path)
-
-    async def _synthesize_openai_compatible(self, text: str, *, preferred: str | None = None) -> Path:
-        voice = self.api_voice if preferred is None else self.api_voice
-        fd, tmp_path = tempfile.mkstemp(prefix='mythic_tts_api_', suffix='.mp3')
-        Path(tmp_path).unlink(missing_ok=True)
-        timeout = aiohttp.ClientTimeout(total=120)
-        headers = {
-            'Authorization': f'Bearer {self.api_key}',
-            'Content-Type': 'application/json',
-        }
-        payload = {
-            'model': self.api_model,
-            'voice': voice,
-            'input': text,
-            'format': 'mp3',
-        }
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.post(f'{self.api_base}/audio/speech', headers=headers, json=payload) as response:
-                body = await response.read()
-                if response.status >= 400:
-                    raise RuntimeError(f'TTS API failed {response.status}: {body[:500].decode("utf-8", errors="ignore")}')
-        Path(tmp_path).write_bytes(body)
-        return Path(tmp_path)
+        path = Path(tmp_path)
+        path.write_bytes(audio)
+        if path.stat().st_size <= 512:
+            raise RuntimeError('ElevenLabs returned an empty or invalid audio file.')
+        return path

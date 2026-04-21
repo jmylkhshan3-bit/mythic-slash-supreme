@@ -3,7 +3,7 @@ from __future__ import annotations
 import discord
 
 from bot.constants import MODE_PRESETS
-from bot.ui.modals import QuickAskModal, SystemNoteModal, VoiceSettingsModal, VoiceSpeakModal
+from bot.ui.modals import QuickAskModal, SpeakModal, SystemNoteModal, VoiceSettingsModal
 
 
 class ModeSelect(discord.ui.Select):
@@ -55,34 +55,20 @@ class ControlCenterView(discord.ui.View):
             attachments=self.cog.brand_files(),
         )
 
-    @discord.ui.button(label='Lock/Unlock Here', style=discord.ButtonStyle.secondary, emoji='🔒', row=1)
-    async def lock_here(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        if interaction.channel is None:
-            await interaction.response.send_message('Channel not found.', ephemeral=True)
-            return
-        state = self.cog.state.toggle_channel_lock(self.guild_id, interaction.channel.id)
-        await interaction.response.edit_message(
-            embed=self.cog.build_panel_embed(self.guild_id, state_override=state),
-            view=ControlCenterView(self.cog, self.guild_id),
-            attachments=self.cog.brand_files(),
-        )
+    @discord.ui.button(label='Speak', style=discord.ButtonStyle.primary, emoji='🗣️', row=1)
+    async def speak(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await interaction.response.send_modal(SpeakModal(self.cog))
 
-    @discord.ui.button(label='Voice Hub', style=discord.ButtonStyle.primary, emoji='🎙️', row=1)
-    async def voice_hub(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    @discord.ui.button(label='Voice Settings', style=discord.ButtonStyle.secondary, emoji='🎙️', row=1)
+    async def voice_settings(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        state = self.cog.state.get(self.guild_id)
+        await interaction.response.send_modal(VoiceSettingsModal(self.cog, state))
+
+    @discord.ui.button(label='YouTube Music', style=discord.ButtonStyle.secondary, emoji='🎵', row=2)
+    async def music(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.send_message(
-            embed=self.cog.build_voice_hub_embed(self.guild_id),
-            files=self.cog.brand_files(),
+            'Use `/music` with a YouTube link, `/loop_music`, or `/end_music`.',
             ephemeral=True,
-            view=self.cog.voice_hub_view(self.guild_id),
-        )
-
-    @discord.ui.button(label='Clear Locks', style=discord.ButtonStyle.danger, emoji='🧹', row=2)
-    async def clear_locks(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        state = self.cog.state.clear_channel_locks(self.guild_id)
-        await interaction.response.edit_message(
-            embed=self.cog.build_panel_embed(self.guild_id, state_override=state),
-            view=ControlCenterView(self.cog, self.guild_id),
-            attachments=self.cog.brand_files(),
         )
 
     @discord.ui.button(label='System Note', style=discord.ButtonStyle.secondary, emoji='📝', row=2)
@@ -97,10 +83,10 @@ class ControlCenterView(discord.ui.View):
             ephemeral=True,
         )
 
-    @discord.ui.button(label='Voice Design', style=discord.ButtonStyle.secondary, emoji='🧩', row=2)
-    async def voice_design(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    @discord.ui.button(label='Gallery', style=discord.ButtonStyle.secondary, emoji='🖼️', row=2)
+    async def gallery(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.send_message(
-            embed=self.cog.build_voice_architecture_embed(self.guild_id),
+            embed=self.cog.build_gallery_embed(self.guild_id),
             files=self.cog.brand_files(),
             ephemeral=True,
         )
@@ -114,56 +100,8 @@ class ControlCenterView(discord.ui.View):
         )
 
 
-class VoiceHubView(discord.ui.View):
-    def __init__(self, cog, guild_id: int) -> None:
-        super().__init__(timeout=900)
-        self.cog = cog
-        self.guild_id = guild_id
-
-    @discord.ui.button(label='Join Voice', style=discord.ButtonStyle.success, emoji='🔊', row=0)
-    async def join_voice(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        await self.cog.handle_voice_action(interaction, action='join', text=None)
-
-    @discord.ui.button(label='Leave Voice', style=discord.ButtonStyle.danger, emoji='🛑', row=0)
-    async def leave_voice(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        await self.cog.handle_voice_action(interaction, action='leave', text=None)
-
-    @discord.ui.button(label='Speak', style=discord.ButtonStyle.primary, emoji='🗣️', row=0)
-    async def speak(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        await interaction.response.send_modal(VoiceSpeakModal(self.cog))
-
-    @discord.ui.button(label='Arm Voice', style=discord.ButtonStyle.success, emoji='🎧', row=1)
-    async def arm(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        await self.cog.handle_voice_arm(interaction)
-
-    @discord.ui.button(label='Disarm', style=discord.ButtonStyle.secondary, emoji='🧯', row=1)
-    async def disarm(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        await self.cog.handle_voice_disarm(interaction)
-
-    @discord.ui.button(label='Voice Settings', style=discord.ButtonStyle.primary, emoji='⚙️', row=1)
-    async def settings(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        state = self.cog.state.get(self.guild_id)
-        await interaction.response.send_modal(VoiceSettingsModal(self.cog, state))
-
-    @discord.ui.button(label='Architecture', style=discord.ButtonStyle.secondary, emoji='🧠', row=2)
-    async def architecture(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        await interaction.response.send_message(
-            embed=self.cog.build_voice_architecture_embed(self.guild_id),
-            files=self.cog.brand_files(),
-            ephemeral=True,
-        )
-
-    @discord.ui.button(label='Refresh Hub', style=discord.ButtonStyle.secondary, emoji='🔄', row=2)
-    async def refresh(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        await interaction.response.edit_message(
-            embed=self.cog.build_voice_hub_embed(self.guild_id),
-            attachments=self.cog.brand_files(),
-            view=self.cog.voice_hub_view(self.guild_id),
-        )
-
-
 class InfoLinksView(discord.ui.View):
     def __init__(self) -> None:
         super().__init__(timeout=300)
         self.add_item(discord.ui.Button(label='OpenRouter', style=discord.ButtonStyle.link, url='https://openrouter.ai/'))
-        self.add_item(discord.ui.Button(label='AssemblyAI', style=discord.ButtonStyle.link, url='https://www.assemblyai.com/'))
+        self.add_item(discord.ui.Button(label='ElevenLabs', style=discord.ButtonStyle.link, url='https://elevenlabs.io/'))

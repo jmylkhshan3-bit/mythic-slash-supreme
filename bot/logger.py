@@ -9,3 +9,5 @@ def setup_logging(level: str = 'INFO') -> None:
         format='[%(asctime)s] [%(levelname)s] %(name)s: %(message)s',
     )
     logging.getLogger('discord.ext.voice_recv.gateway').setLevel(logging.WARNING)
+
+    logging.getLogger('discord.player').setLevel(logging.WARNING)
