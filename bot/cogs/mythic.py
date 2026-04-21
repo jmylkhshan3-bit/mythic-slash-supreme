@@ -39,7 +39,6 @@ class MythicCog(commands.Cog):
         self.presence_manager = bot.presence_manager
         self.voice_runtime = bot.voice_runtime
         self.elevenlabs = bot.elevenlabs_client
-        self.music = bot.music_manager
 
     def brand_files(self) -> list[discord.File]:
         files: list[discord.File] = []
@@ -53,14 +52,12 @@ class MythicCog(commands.Cog):
 
     def build_status_embed(self, guild_id: int | None, state_override: dict | None = None) -> discord.Embed:
         snapshot = state_override or self.state.get(guild_id)
-        music_state = self.music.snapshot(guild_id)
-        embed = status_embed(snapshot, snapshot.get('mode', 'normal'), self.assets.asset_status(), self.bot.settings.openrouter_model, music_state)
+        embed = status_embed(snapshot, snapshot.get('mode', 'normal'), self.assets.asset_status(), self.bot.settings.openrouter_model)
         return apply_branding(embed, has_banner=self.assets.banner_path() is not None, has_avatar=self.assets.avatar_path() is not None)
 
     def build_panel_embed(self, guild_id: int, state_override: dict | None = None) -> discord.Embed:
         snapshot = state_override or self.state.get(guild_id)
-        music_state = self.music.snapshot(guild_id)
-        embed = panel_embed(snapshot, snapshot.get('mode', 'normal'), self.bot.settings.activation_phrase, music_state)
+        embed = panel_embed(snapshot, snapshot.get('mode', 'normal'), self.bot.settings.activation_phrase)
         return apply_branding(embed, has_banner=self.assets.banner_path() is not None, has_avatar=self.assets.avatar_path() is not None)
 
     def build_info_embed(self, mode: str) -> discord.Embed:
@@ -184,6 +181,35 @@ class MythicCog(commands.Cog):
             chunks.append('Unsupported attachment type for deep parsing in this build.')
         return '\n\n'.join(chunks)[:12000], image_urls
 
+    async def handle_voice_join(self, interaction: discord.Interaction) -> None:
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            vc = await self.voice_runtime.connect_or_move(interaction)
+            channel_name = getattr(vc.channel, 'name', 'voice') if getattr(vc, 'channel', None) else 'voice'
+            await interaction.followup.send(
+                f'Joined **{channel_name}**.',
+                embed=self.build_status_embed(interaction.guild.id if interaction.guild else None),
+                files=self.brand_files(),
+                ephemeral=True,
+            )
+        except Exception as exc:
+            log.exception('Voice join failed')
+            await interaction.followup.send(f'Voice join failed: {exc}', ephemeral=True)
+
+    async def handle_voice_leave(self, interaction: discord.Interaction) -> None:
+        if interaction.guild is None:
+            await interaction.response.send_message('This command works only inside a server.', ephemeral=True)
+            return
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            await self.voice_runtime.disconnect(interaction.guild)
+            await interaction.followup.send('Left the voice channel.', ephemeral=True)
+        except Exception as exc:
+            log.exception('Voice leave failed')
+            await interaction.followup.send(f'Voice leave failed: {exc}', ephemeral=True)
+
     async def handle_speak(self, interaction: discord.Interaction, text: str) -> None:
         if not interaction.response.is_done():
             await interaction.response.defer(ephemeral=True, thinking=True)
@@ -200,28 +226,6 @@ class MythicCog(commands.Cog):
             log.exception('Speak failed')
             await interaction.followup.send(f'Speak failed: {exc}', ephemeral=True)
 
-    async def handle_music(self, interaction: discord.Interaction, url: str) -> None:
-        if interaction.guild is None:
-            await interaction.response.send_message('This command works only inside a server.', ephemeral=True)
-            return
-        if not interaction.response.is_done():
-            await interaction.response.defer(ephemeral=True, thinking=True)
-        voice_state = getattr(interaction.user, 'voice', None)
-        if voice_state is None or voice_state.channel is None:
-            await interaction.followup.send('Join a voice channel first.', ephemeral=True)
-            return
-        try:
-            title = await self.music.play_youtube(interaction.guild, voice_state.channel, url)
-            await self.voice_runtime.connect_or_move(interaction)
-            await interaction.followup.send(
-                f'Now playing **{title}**.',
-                embed=self.build_status_embed(interaction.guild.id),
-                files=self.brand_files(),
-                ephemeral=True,
-            )
-        except Exception as exc:
-            log.exception('Music failed')
-            await interaction.followup.send(f'Music failed: {exc}', ephemeral=True)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
@@ -344,32 +348,21 @@ class MythicCog(commands.Cog):
             ephemeral=True,
         )
 
+    @app_commands.command(name='voice_join', description='Join your current voice channel.')
+    async def voice_join(self, interaction: discord.Interaction) -> None:
+        await self.handle_voice_join(interaction)
+
+    @app_commands.command(name='voice_leave', description='Leave the current voice channel.')
+    async def voice_leave(self, interaction: discord.Interaction) -> None:
+        await self.handle_voice_leave(interaction)
+
     @app_commands.command(name='speak', description='Join your current voice channel and speak text with ElevenLabs.')
     @app_commands.describe(text='Text for the bot to speak in voice')
     async def speak(self, interaction: discord.Interaction, text: str) -> None:
         await self.handle_speak(interaction, text)
 
-    @app_commands.command(name='music', description='Play a YouTube link in your current voice channel.')
-    @app_commands.describe(url='YouTube link')
-    async def music(self, interaction: discord.Interaction, url: str) -> None:
-        await self.handle_music(interaction, url)
 
-    @app_commands.command(name='end_music', description='Stop the current YouTube track.')
-    async def end_music(self, interaction: discord.Interaction) -> None:
-        if interaction.guild is None:
-            await interaction.response.send_message('This command works only inside a server.', ephemeral=True)
-            return
-        await interaction.response.defer(ephemeral=True)
-        await self.music.stop(interaction.guild)
-        await interaction.followup.send('Music stopped.', ephemeral=True)
 
-    @app_commands.command(name='loop_music', description='Toggle loop for the current YouTube track.')
-    async def loop_music(self, interaction: discord.Interaction, enabled: bool) -> None:
-        if interaction.guild is None:
-            await interaction.response.send_message('This command works only inside a server.', ephemeral=True)
-            return
-        current = self.music.set_loop(interaction.guild.id, enabled)
-        await interaction.response.send_message(f'Music loop is now **{"on" if current else "off"}**.', ephemeral=True)
 
     @app_commands.command(name='transcribe', description='Transcribe an attached audio or video file with ElevenLabs.')
     @app_commands.describe(file='Audio or video attachment to transcribe')

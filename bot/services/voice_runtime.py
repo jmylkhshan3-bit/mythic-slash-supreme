@@ -23,7 +23,6 @@ except Exception:  # pragma: no cover
 if TYPE_CHECKING:
     from bot.config import Settings
     from bot.services.elevenlabs_client import ElevenLabsClient, TranscriptResult
-    from bot.services.music_service import MusicManager
     from bot.services.openrouter_client import OpenRouterClient
     from bot.services.tts_service import TTSService
     from bot.state import GuildStateManager
@@ -100,7 +99,6 @@ class VoiceRuntimeManager:
         openrouter_client: 'OpenRouterClient',
         elevenlabs_client: 'ElevenLabsClient',
         tts_service: 'TTSService',
-        music_manager: 'MusicManager',
     ) -> None:
         self.bot = bot
         self.settings = settings
@@ -108,7 +106,6 @@ class VoiceRuntimeManager:
         self.openrouter_client = openrouter_client
         self.elevenlabs_client = elevenlabs_client
         self.tts_service = tts_service
-        self.music_manager = music_manager
         self._sessions: dict[int, GuildVoiceSession] = {}
 
     @property
@@ -186,7 +183,7 @@ class VoiceRuntimeManager:
 
     def _feed_pcm_sync(self, guild_id: int, user_id: int, display_name: str, pcm: bytes) -> None:
         session = self._sessions.get(guild_id)
-        if session is None or self.music_manager.is_playing(guild_id) or session.bot_speaking:
+        if session is None or session.bot_speaking:
             return
         level = self._pcm_dbfs(pcm)
         state = self.state_manager.get(guild_id)
@@ -217,8 +214,6 @@ class VoiceRuntimeManager:
                 session = self._sessions.get(guild_id)
                 if session is None:
                     return
-                if self.music_manager.is_playing(guild_id):
-                    continue
                 state = self.state_manager.get(guild_id)
                 silence_seconds = float(state.get('voice_silence_seconds', self.settings.voice_silence_seconds))
                 now = time.monotonic()

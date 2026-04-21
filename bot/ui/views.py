@@ -64,18 +64,20 @@ class ControlCenterView(discord.ui.View):
         state = self.cog.state.get(self.guild_id)
         await interaction.response.send_modal(VoiceSettingsModal(self.cog, state))
 
-    @discord.ui.button(label='YouTube Music', style=discord.ButtonStyle.secondary, emoji='🎵', row=2)
-    async def music(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        await interaction.response.send_message(
-            'Use `/music` with a YouTube link, `/loop_music`, or `/end_music`.',
-            ephemeral=True,
-        )
+    @discord.ui.button(label='Join Voice', style=discord.ButtonStyle.success, emoji='🔊', row=2)
+    async def join_voice(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await self.cog.handle_voice_join(interaction)
 
-    @discord.ui.button(label='System Note', style=discord.ButtonStyle.secondary, emoji='📝', row=2)
+    @discord.ui.button(label='Leave Voice', style=discord.ButtonStyle.danger, emoji='📴', row=2)
+    async def leave_voice(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await self.cog.handle_voice_leave(interaction)
+
+
+    @discord.ui.button(label='System Note', style=discord.ButtonStyle.secondary, emoji='📝', row=3)
     async def system_note(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.send_modal(SystemNoteModal(self.cog))
 
-    @discord.ui.button(label='Status', style=discord.ButtonStyle.primary, emoji='📊', row=2)
+    @discord.ui.button(label='Status', style=discord.ButtonStyle.primary, emoji='📊', row=3)
     async def status(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.send_message(
             embed=self.cog.build_status_embed(self.guild_id),
@@ -83,7 +85,7 @@ class ControlCenterView(discord.ui.View):
             ephemeral=True,
         )
 
-    @discord.ui.button(label='Gallery', style=discord.ButtonStyle.secondary, emoji='🖼️', row=2)
+    @discord.ui.button(label='Gallery', style=discord.ButtonStyle.secondary, emoji='🖼️', row=3)
     async def gallery(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.send_message(
             embed=self.cog.build_gallery_embed(self.guild_id),
@@ -91,7 +93,7 @@ class ControlCenterView(discord.ui.View):
             ephemeral=True,
         )
 
-    @discord.ui.button(label='Refresh', style=discord.ButtonStyle.secondary, emoji='🔄', row=2)
+    @discord.ui.button(label='Refresh', style=discord.ButtonStyle.secondary, emoji='🔄', row=3)
     async def refresh(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.edit_message(
             embed=self.cog.build_panel_embed(self.guild_id),

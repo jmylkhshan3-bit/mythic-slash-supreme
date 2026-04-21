@@ -14,7 +14,6 @@ DEFAULT_GUILD_STATE = {
     'voice_silence_seconds': 5.0,
     'voice_trigger_level_db': -55.0,
     'voice_wake_phrase': 'hey m',
-    'music_loop': False,
 }
 
 
@@ -100,6 +99,3 @@ class GuildStateManager:
         if trigger_level_db is not None:
             patch['voice_trigger_level_db'] = float(trigger_level_db)
         return self._update(guild_id, **patch)
-
-    def set_music_loop(self, guild_id: int, enabled: bool) -> dict:
-        return self._update(guild_id, music_loop=bool(enabled))

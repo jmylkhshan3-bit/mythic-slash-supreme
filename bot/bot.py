@@ -10,7 +10,6 @@ from bot.config import Settings
 from bot.logger import setup_logging
 from bot.services.assets import AssetManager
 from bot.services.elevenlabs_client import ElevenLabsClient
-from bot.services.music_service import MusicManager
 from bot.services.openrouter_client import OpenRouterClient
 from bot.services.status_manager import PresenceManager
 from bot.services.tts_service import TTSService
@@ -42,7 +41,6 @@ class MythicBot(commands.Bot):
         self.tts_service = TTSService(elevenlabs_client=self.elevenlabs_client)
         self.asset_manager = AssetManager(settings.internal_assets_dir, settings.external_assets_dir)
         self.presence_manager = PresenceManager(self, settings.default_mode)
-        self.music_manager = MusicManager(self.state_manager, self)
         self.voice_runtime = VoiceRuntimeManager(
             bot=self,
             settings=settings,
@@ -50,7 +48,6 @@ class MythicBot(commands.Bot):
             openrouter_client=self.openrouter_client,
             elevenlabs_client=self.elevenlabs_client,
             tts_service=self.tts_service,
-            music_manager=self.music_manager,
         )
 
     async def setup_hook(self) -> None:

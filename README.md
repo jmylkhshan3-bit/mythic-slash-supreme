@@ -6,7 +6,6 @@ Discord AI bot with:
 - ElevenLabs text-to-speech and speech-to-text
 - wake phrase voice capture (`hey m`) when the bot is in a voice channel
 - automatic Arabic / English voice replies
-- YouTube music playback with loop support
 - bundled internal assets for Railway and mobile
 
 ## Main commands
@@ -14,10 +13,9 @@ Discord AI bot with:
 - `/setup`
 - `/panel`
 - `/status`
+- `/voice_join`
+- `/voice_leave`
 - `/speak`
-- `/music`
-- `/loop_music`
-- `/end_music`
 - `/gallery`
 - `/transcribe`
 
@@ -26,7 +24,7 @@ Mention the bot in a server or send a DM. Attach images, text files, audio, vide
 
 ## Voice flow
 1. Join a voice channel.
-2. Use `/speak` once or `/music` once so the bot joins your voice room.
+2. Use `/voice_join` or `/speak` so the bot joins your voice room.
 3. Say `hey m` followed by your request.
 4. After about 5 seconds of silence, the bot transcribes the audio, asks the AI, and speaks the answer in Arabic or English automatically.
 

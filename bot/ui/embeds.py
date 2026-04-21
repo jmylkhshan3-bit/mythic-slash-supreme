@@ -44,9 +44,9 @@ def response_embed(mode: str, prompt: str, answer: str, user_name: str) -> disco
     return embed
 
 
-def panel_embed(snapshot: dict, mode: str, activation_phrase: str, music_state: dict) -> discord.Embed:
+def panel_embed(snapshot: dict, mode: str, activation_phrase: str) -> discord.Embed:
     preset = MODE_PRESETS.get(mode, MODE_PRESETS['normal'])
-    embed = shell('Command Center', 'Legendary setup surface for AI, voice capture, image analysis, and YouTube music.', mode)
+    embed = shell('Command Center', 'Legendary setup surface for AI, voice capture, image analysis, and instant speech replies.', mode)
     embed.add_field(name='Current Mode', value=f'{preset.emoji} {preset.label}', inline=True)
     embed.add_field(name='Mentions', value='Enabled' if snapshot.get('mention_enabled') else 'Disabled', inline=True)
     embed.add_field(name='Channel Locks', value=str(len(snapshot.get('allowed_channel_ids', []))), inline=True)
@@ -73,24 +73,17 @@ def panel_embed(snapshot: dict, mode: str, activation_phrase: str, music_state: 
         ),
         inline=False,
     )
-    music_text = 'Inactive'
-    if music_state.get('active'):
-        music_text = f'Playing **{music_state.get("title", "YouTube audio")}**'
     embed.add_field(
-        name='Music Surface',
-        value=(
-            f'{music_text}\n'
-            f'Loop: `{"on" if music_state.get("loop") else "off"}`\n'
-            'Use `/music`, `/loop_music`, `/end_music`'
-        ),
+        name='Voice Commands',
+        value='Use `/voice_join`, `/voice_leave`, `/speak`, and `/transcribe`.',
         inline=False,
     )
     return embed
 
 
-def status_embed(snapshot: dict, mode: str, asset_status: dict[str, str], model_name: str, music_state: dict) -> discord.Embed:
+def status_embed(snapshot: dict, mode: str, asset_status: dict[str, str], model_name: str) -> discord.Embed:
     channels = snapshot.get('allowed_channel_ids', [])
-    embed = shell('Status Wall', 'Runtime snapshot, voice profile, music state, and asset health.', mode)
+    embed = shell('Status Wall', 'Runtime snapshot, voice profile, and asset health.', mode)
     embed.add_field(name='Mode', value=snapshot.get('mode', 'normal'), inline=True)
     embed.add_field(name='Mention Replies', value='ON' if snapshot.get('mention_enabled') else 'OFF', inline=True)
     embed.add_field(name='Allowed Channels', value=str(len(channels)), inline=True)
@@ -104,15 +97,6 @@ def status_embed(snapshot: dict, mode: str, asset_status: dict[str, str], model_
             f'Silence: `{snapshot.get("voice_silence_seconds", 5.0)}` sec\n'
             f'Trigger: `{snapshot.get("voice_trigger_level_db", -55.0)} dB`\n'
             'Reply language: `auto Arabic / English`'
-        ),
-        inline=False,
-    )
-    embed.add_field(
-        name='Music',
-        value=(
-            f'Active: `{"yes" if music_state.get("active") else "no"}`\n'
-            f'Loop: `{"on" if music_state.get("loop") else "off"}`\n'
-            f'Title: `{music_state.get("title") or "none"}`'
         ),
         inline=False,
     )
@@ -133,7 +117,7 @@ def status_embed(snapshot: dict, mode: str, asset_status: dict[str, str], model_
 
 
 def info_embed(mode: str, model_name: str, icon_count: int) -> discord.Embed:
-    embed = shell('Build Profile', 'Mythic is tuned for premium slash UX, bilingual voice replies, file analysis, and YouTube playback.', mode)
+    embed = shell('Build Profile', 'Mythic is tuned for premium slash UX, bilingual voice replies, file analysis, and voice automation.', mode)
     embed.add_field(name='AI Router', value=model_name, inline=False)
     embed.add_field(name='Voice', value='ElevenLabs STT + TTS with auto Arabic/English reply flow', inline=False)
     embed.add_field(name='Icons Loaded', value=str(icon_count), inline=True)
@@ -147,12 +131,9 @@ def help_embed(mode: str) -> discord.Embed:
     embed.add_field(name='/setup', value='Open the main control dashboard.', inline=True)
     embed.add_field(name='/panel', value='Open the dashboard again.', inline=True)
     embed.add_field(name='/status', value='Inspect runtime state and asset health.', inline=True)
+    embed.add_field(name='/voice_join', value='Join your current voice channel.', inline=True)
+    embed.add_field(name='/voice_leave', value='Leave voice and stop active playback.', inline=True)
     embed.add_field(name='/speak', value='Join your voice channel and speak text aloud.', inline=True)
-    embed.add_field(name='/music', value='Play a YouTube link in voice.', inline=True)
-    embed.add_field(name='/loop_music', value='Toggle looping for the YouTube track.', inline=True)
-    embed.add_field(name='/end_music', value='Stop the active track.', inline=True)
-    embed.add_field(name='/transcribe', value='Transcribe an attached audio or video file.', inline=True)
-    embed.add_field(name='/gallery', value='See the asset gallery and icon catalog.', inline=True)
     return embed
 
 
