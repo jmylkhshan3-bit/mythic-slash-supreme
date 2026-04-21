@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-BOT_VERSION = '2.1.0'
+BOT_VERSION = '2.2.0'
 
 
 @dataclass(frozen=True, slots=True)

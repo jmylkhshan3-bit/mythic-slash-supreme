@@ -3,7 +3,7 @@ from __future__ import annotations
 import discord
 
 from bot.constants import MODE_PRESETS
-from bot.ui.modals import QuickAskModal, SpeakModal, SystemNoteModal, VoiceSettingsModal
+from bot.ui.modals import QuickAskModal, SystemNoteModal
 
 
 class ModeSelect(discord.ui.Select):
@@ -55,29 +55,27 @@ class ControlCenterView(discord.ui.View):
             attachments=self.cog.brand_files(),
         )
 
-    @discord.ui.button(label='Speak', style=discord.ButtonStyle.primary, emoji='🗣️', row=1)
-    async def speak(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        await interaction.response.send_modal(SpeakModal(self.cog))
+    @discord.ui.button(label='AFK Join', style=discord.ButtonStyle.primary, emoji='🌙', row=1)
+    async def afk_join(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await self.cog.handle_voice_afk(interaction)
 
-    @discord.ui.button(label='Voice Settings', style=discord.ButtonStyle.secondary, emoji='🎙️', row=1)
-    async def voice_settings(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        state = self.cog.state.get(self.guild_id)
-        await interaction.response.send_modal(VoiceSettingsModal(self.cog, state))
-
-    @discord.ui.button(label='Join Voice', style=discord.ButtonStyle.success, emoji='🔊', row=2)
-    async def join_voice(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        await self.cog.handle_voice_join(interaction)
-
-    @discord.ui.button(label='Leave Voice', style=discord.ButtonStyle.danger, emoji='📴', row=2)
+    @discord.ui.button(label='Leave Voice', style=discord.ButtonStyle.danger, emoji='📴', row=1)
     async def leave_voice(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await self.cog.handle_voice_leave(interaction)
 
+    @discord.ui.button(label='Vision Tips', style=discord.ButtonStyle.secondary, emoji='🖼️', row=2)
+    async def vision_tips(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await interaction.response.send_message(
+            embed=self.cog.build_vision_embed(self.guild_id),
+            files=self.cog.brand_files(),
+            ephemeral=True,
+        )
 
-    @discord.ui.button(label='System Note', style=discord.ButtonStyle.secondary, emoji='📝', row=3)
+    @discord.ui.button(label='System Note', style=discord.ButtonStyle.secondary, emoji='📝', row=2)
     async def system_note(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.send_modal(SystemNoteModal(self.cog))
 
-    @discord.ui.button(label='Status', style=discord.ButtonStyle.primary, emoji='📊', row=3)
+    @discord.ui.button(label='Status', style=discord.ButtonStyle.primary, emoji='📊', row=2)
     async def status(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.send_message(
             embed=self.cog.build_status_embed(self.guild_id),
@@ -85,7 +83,7 @@ class ControlCenterView(discord.ui.View):
             ephemeral=True,
         )
 
-    @discord.ui.button(label='Gallery', style=discord.ButtonStyle.secondary, emoji='🖼️', row=3)
+    @discord.ui.button(label='Gallery', style=discord.ButtonStyle.secondary, emoji='🧩', row=3)
     async def gallery(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.send_message(
             embed=self.cog.build_gallery_embed(self.guild_id),
@@ -104,6 +102,6 @@ class ControlCenterView(discord.ui.View):
 
 class InfoLinksView(discord.ui.View):
     def __init__(self) -> None:
-        super().__init__(timeout=300)
-        self.add_item(discord.ui.Button(label='OpenRouter', style=discord.ButtonStyle.link, url='https://openrouter.ai/'))
-        self.add_item(discord.ui.Button(label='ElevenLabs', style=discord.ButtonStyle.link, url='https://elevenlabs.io/'))
+        super().__init__(timeout=900)
+        self.add_item(discord.ui.Button(label='OpenRouter', url='https://openrouter.ai'))
+        self.add_item(discord.ui.Button(label='Discord Developer Portal', url='https://discord.com/developers/applications'))

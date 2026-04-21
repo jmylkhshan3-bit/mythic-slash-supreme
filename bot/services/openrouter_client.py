@@ -35,6 +35,13 @@ class OpenRouterClient:
             instruction += 'Reply in English. '
         else:
             instruction += 'If the user writes in Arabic, answer in Arabic first; otherwise answer in English. '
+
+        if image_urls:
+            instruction += (
+                'Image analysis mode is active. Inspect the visible content carefully. '
+                'Describe important objects, layout, text, UI structure, colors, warnings, and unusual details. '
+                'If text is partly unclear, say that explicitly instead of guessing. '
+            )
         if attachment_context:
             instruction += f"Attachment context follows. Use it directly.\n\n{attachment_context[:12000]}\n\n"
         user_text = instruction + 'User request:\n' + prompt

@@ -9,11 +9,6 @@ DEFAULT_GUILD_STATE = {
     'mention_enabled': True,
     'allowed_channel_ids': [],
     'system_note': '',
-    'voice_input_language': 'auto',
-    'voice_output_language': 'auto',
-    'voice_silence_seconds': 5.0,
-    'voice_trigger_level_db': -55.0,
-    'voice_wake_phrase': 'hey m',
 }
 
 
@@ -76,26 +71,3 @@ class GuildStateManager:
 
     def set_system_note(self, guild_id: int, note: str) -> dict:
         return self._update(guild_id, system_note=note.strip())
-
-    def set_voice_profile(
-        self,
-        guild_id: int,
-        *,
-        wake_phrase: str | None = None,
-        input_language: str | None = None,
-        output_language: str | None = None,
-        silence_seconds: float | None = None,
-        trigger_level_db: float | None = None,
-    ) -> dict:
-        patch: dict[str, object] = {}
-        if wake_phrase is not None:
-            patch['voice_wake_phrase'] = wake_phrase.strip().lower() or 'hey m'
-        if input_language is not None:
-            patch['voice_input_language'] = input_language.strip().lower() or 'auto'
-        if output_language is not None:
-            patch['voice_output_language'] = output_language.strip().lower() or 'auto'
-        if silence_seconds is not None:
-            patch['voice_silence_seconds'] = max(0.8, float(silence_seconds))
-        if trigger_level_db is not None:
-            patch['voice_trigger_level_db'] = float(trigger_level_db)
-        return self._update(guild_id, **patch)

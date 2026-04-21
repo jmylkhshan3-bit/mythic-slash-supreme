@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import random
 import zipfile
@@ -20,14 +19,13 @@ from bot.ui.embeds import (
     panel_embed,
     response_embed,
     status_embed,
-    transcript_embed,
+    vision_embed,
 )
 from bot.ui.views import ControlCenterView, InfoLinksView
 
 log = logging.getLogger(__name__)
 
-TEXT_SUFFIXES = {'.txt', '.md', '.py', '.js', '.ts', '.json', '.yml', '.yaml', '.html', '.css', '.sql', '.csv'}
-AUDIO_SUFFIXES = {'.mp3', '.wav', '.m4a', '.ogg', '.flac', '.mp4', '.mov', '.webm'}
+TEXT_SUFFIXES = {'.txt', '.md', '.py', '.js', '.ts', '.json', '.yml', '.yaml', '.html', '.css', '.sql', '.csv', '.log'}
 
 
 class MythicCog(commands.Cog):
@@ -37,8 +35,7 @@ class MythicCog(commands.Cog):
         self.ai = bot.openrouter_client
         self.assets = bot.asset_manager
         self.presence_manager = bot.presence_manager
-        self.voice_runtime = bot.voice_runtime
-        self.elevenlabs = bot.elevenlabs_client
+        self.voice_afk = bot.voice_afk_manager
 
     def brand_files(self) -> list[discord.File]:
         files: list[discord.File] = []
@@ -50,14 +47,23 @@ class MythicCog(commands.Cog):
             files.append(avatar)
         return files
 
-    def build_status_embed(self, guild_id: int | None, state_override: dict | None = None) -> discord.Embed:
+    def _voice_snapshot(self, guild: discord.Guild | None) -> dict[str, object]:
+        return self.voice_afk.snapshot(guild)
+
+    def build_status_embed(self, guild_id: int | None, state_override: dict | None = None, guild: discord.Guild | None = None) -> discord.Embed:
         snapshot = state_override or self.state.get(guild_id)
-        embed = status_embed(snapshot, snapshot.get('mode', 'normal'), self.assets.asset_status(), self.bot.settings.openrouter_model)
+        embed = status_embed(
+            snapshot,
+            snapshot.get('mode', 'normal'),
+            self.assets.asset_status(),
+            self.bot.settings.openrouter_model,
+            self._voice_snapshot(guild),
+        )
         return apply_branding(embed, has_banner=self.assets.banner_path() is not None, has_avatar=self.assets.avatar_path() is not None)
 
-    def build_panel_embed(self, guild_id: int, state_override: dict | None = None) -> discord.Embed:
+    def build_panel_embed(self, guild_id: int, state_override: dict | None = None, guild: discord.Guild | None = None) -> discord.Embed:
         snapshot = state_override or self.state.get(guild_id)
-        embed = panel_embed(snapshot, snapshot.get('mode', 'normal'), self.bot.settings.activation_phrase)
+        embed = panel_embed(snapshot, snapshot.get('mode', 'normal'), self._voice_snapshot(guild))
         return apply_branding(embed, has_banner=self.assets.banner_path() is not None, has_avatar=self.assets.avatar_path() is not None)
 
     def build_info_embed(self, mode: str) -> discord.Embed:
@@ -69,12 +75,17 @@ class MythicCog(commands.Cog):
         embed = gallery_embed(mode, self.assets.icon_names())
         return apply_branding(embed, has_banner=self.assets.banner_path() is not None, has_avatar=self.assets.avatar_path() is not None)
 
+    def build_vision_embed(self, guild_id: int | None) -> discord.Embed:
+        mode = self.state.get(guild_id).get('mode', 'normal')
+        embed = vision_embed(mode)
+        return apply_branding(embed, has_banner=self.assets.banner_path() is not None, has_avatar=self.assets.avatar_path() is not None)
+
     async def _send_setup_panel(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
             await interaction.response.send_message('This command works only inside a server.', ephemeral=True)
             return
         await interaction.response.send_message(
-            embed=self.build_panel_embed(interaction.guild.id),
+            embed=self.build_panel_embed(interaction.guild.id, guild=interaction.guild),
             view=ControlCenterView(self, interaction.guild.id),
             files=self.brand_files(),
         )
@@ -140,10 +151,21 @@ class MythicCog(commands.Cog):
             return '', []
         chunks: list[str] = []
         image_urls: list[str] = []
-        for attachment in attachments[:4]:
+        for attachment in attachments[:5]:
             suffix = Path(attachment.filename).suffix.lower()
             content_type = (attachment.content_type or '').lower()
-            chunks.append(f'Attachment: {attachment.filename} ({content_type or "unknown"})')
+            meta = [
+                f'Attachment: {attachment.filename}',
+                f'Content type: {content_type or "unknown"}',
+                f'Size bytes: {attachment.size}',
+            ]
+            if attachment.width:
+                meta.append(f'Width: {attachment.width}')
+            if attachment.height:
+                meta.append(f'Height: {attachment.height}')
+            if attachment.description:
+                meta.append(f'Description: {attachment.description}')
+            chunks.append('\n'.join(meta))
             if suffix in TEXT_SUFFIXES or content_type.startswith('text/'):
                 try:
                     raw = await attachment.read()
@@ -151,51 +173,42 @@ class MythicCog(commands.Cog):
                 except Exception as exc:
                     text = f'Failed to read text attachment: {exc}'
                 if text:
-                    chunks.append(text[:6000])
+                    chunks.append(text[:7000])
                 continue
             if suffix == '.zip':
                 try:
                     import io
                     raw = await attachment.read()
                     with zipfile.ZipFile(io.BytesIO(raw)) as zf:
-                        names = '\n'.join(zf.namelist()[:80])
+                        names = '\n'.join(zf.namelist()[:120])
                     chunks.append('ZIP file entries:\n' + names)
                 except Exception as exc:
                     chunks.append(f'Failed to inspect ZIP: {exc}')
                 continue
-            if suffix in AUDIO_SUFFIXES or content_type.startswith('audio/') or content_type.startswith('video/'):
-                if not self.elevenlabs.enabled:
-                    chunks.append('Audio/video attachment detected, but ELEVENLABS_API_KEY is missing.')
-                    continue
-                try:
-                    raw = await attachment.read()
-                    result = await self.elevenlabs.speech_to_text(data=raw, filename=attachment.filename)
-                    chunks.append('Transcription:\n' + (result.text or '[no speech detected]'))
-                except Exception as exc:
-                    chunks.append(f'Failed to transcribe audio: {exc}')
-                continue
             if content_type.startswith('image/'):
                 image_urls.append(attachment.url)
-                chunks.append('Image attachment detected. Inspect the image content directly and answer using visible details.')
+                chunks.append(
+                    'Image attachment detected. Inspect it carefully for visible text, scene details, UI structure, colors, warnings, charts, numbers, and anomalies.'
+                )
                 continue
-            chunks.append('Unsupported attachment type for deep parsing in this build.')
-        return '\n\n'.join(chunks)[:12000], image_urls
+            chunks.append('Unsupported attachment type for deep parsing in this build. Summarize its metadata only.')
+        return '\n\n'.join(chunks)[:14000], image_urls
 
-    async def handle_voice_join(self, interaction: discord.Interaction) -> None:
+    async def handle_voice_afk(self, interaction: discord.Interaction) -> None:
         if not interaction.response.is_done():
             await interaction.response.defer(ephemeral=True, thinking=True)
         try:
-            vc = await self.voice_runtime.connect_or_move(interaction)
+            vc = await self.voice_afk.connect_or_move_afk(interaction)
             channel_name = getattr(vc.channel, 'name', 'voice') if getattr(vc, 'channel', None) else 'voice'
             await interaction.followup.send(
-                f'Joined **{channel_name}**.',
-                embed=self.build_status_embed(interaction.guild.id if interaction.guild else None),
+                f'AFK mode is active in **{channel_name}**. The bot will stay silent there until you move it or disconnect it.',
+                embed=self.build_status_embed(interaction.guild.id if interaction.guild else None, guild=interaction.guild),
                 files=self.brand_files(),
                 ephemeral=True,
             )
         except Exception as exc:
-            log.exception('Voice join failed')
-            await interaction.followup.send(f'Voice join failed: {exc}', ephemeral=True)
+            log.exception('Voice AFK join failed')
+            await interaction.followup.send(f'Voice AFK join failed: {exc}', ephemeral=True)
 
     async def handle_voice_leave(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
@@ -204,28 +217,11 @@ class MythicCog(commands.Cog):
         if not interaction.response.is_done():
             await interaction.response.defer(ephemeral=True, thinking=True)
         try:
-            await self.voice_runtime.disconnect(interaction.guild)
+            await self.voice_afk.disconnect(interaction.guild)
             await interaction.followup.send('Left the voice channel.', ephemeral=True)
         except Exception as exc:
             log.exception('Voice leave failed')
             await interaction.followup.send(f'Voice leave failed: {exc}', ephemeral=True)
-
-    async def handle_speak(self, interaction: discord.Interaction, text: str) -> None:
-        if not interaction.response.is_done():
-            await interaction.response.defer(ephemeral=True, thinking=True)
-        try:
-            await self.voice_runtime.connect_or_move(interaction)
-            channel_name = await self.voice_runtime.speak_text(interaction.guild, text)
-            await interaction.followup.send(
-                f'Speaking now in **{channel_name}**.',
-                embed=self.build_status_embed(interaction.guild.id if interaction.guild else None),
-                files=self.brand_files(),
-                ephemeral=True,
-            )
-        except Exception as exc:
-            log.exception('Speak failed')
-            await interaction.followup.send(f'Speak failed: {exc}', ephemeral=True)
-
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
@@ -249,13 +245,15 @@ class MythicCog(commands.Cog):
                 return
             prompt = message.content.replace(self.bot.user.mention, '').strip()
 
-        if not prompt and not message.attachments:
-            await message.reply('Mention me with a question, or attach a file/image/audio clip with instructions.')
+        attachment_context, image_urls = await self._extract_attachment_context(list(message.attachments))
+        if not prompt and image_urls:
+            prompt = 'Analyze the attached image(s) in detail. Describe important objects, visible text, layout, colors, UI structure, and anything unusual.'
+        elif not prompt and attachment_context:
+            prompt = 'Analyze the attached content and summarize the most important details.'
+        elif not prompt:
+            await message.reply('Mention me with a question, or attach a file/image with instructions.')
             return
 
-        attachment_context, image_urls = await self._extract_attachment_context(list(message.attachments))
-        if not prompt:
-            prompt = 'Analyze the attached content.'
         async with message.channel.typing():
             await self.animate_response(
                 send_callback=lambda **kwargs: message.reply(**kwargs),
@@ -276,6 +274,25 @@ class MythicCog(commands.Cog):
         attachment_context, image_urls = await self._extract_attachment_context([attachment] if attachment else [])
         await self.run_ai_flow(interaction, prompt, mode.value if mode else None, attachment_context=attachment_context, image_urls=image_urls)
 
+    @app_commands.command(name='vision', description='Analyze one to three images in more detail.')
+    @app_commands.describe(prompt='Optional instruction for the image analysis', image1='Primary image', image2='Optional extra image', image3='Optional extra image')
+    async def vision(
+        self,
+        interaction: discord.Interaction,
+        image1: discord.Attachment,
+        prompt: str = '',
+        image2: discord.Attachment | None = None,
+        image3: discord.Attachment | None = None,
+    ) -> None:
+        attachments = [image1]
+        if image2:
+            attachments.append(image2)
+        if image3:
+            attachments.append(image3)
+        attachment_context, image_urls = await self._extract_attachment_context(attachments)
+        final_prompt = prompt.strip() or 'Analyze these image attachments in detail. Explain visible text, layout, objects, mood, style, and anything important.'
+        await self.run_ai_flow(interaction, final_prompt, attachment_context=attachment_context, image_urls=image_urls)
+
     @app_commands.command(name='mode', description='Change the live server mode for everyone.')
     @app_commands.choices(mode=[app_commands.Choice(name=label, value=value) for label, value in MODE_CHOICES])
     async def mode(self, interaction: discord.Interaction, mode: app_commands.Choice[str]) -> None:
@@ -285,7 +302,7 @@ class MythicCog(commands.Cog):
         state = self.state.set_mode(interaction.guild.id, mode.value)
         self.presence_manager.set_mode(mode.value)
         await interaction.response.send_message(
-            embed=self.build_status_embed(interaction.guild.id, state_override=state),
+            embed=self.build_status_embed(interaction.guild.id, state_override=state, guild=interaction.guild),
             files=self.brand_files(),
         )
 
@@ -300,7 +317,7 @@ class MythicCog(commands.Cog):
     @app_commands.command(name='status', description='Inspect runtime state and asset health.')
     async def status(self, interaction: discord.Interaction) -> None:
         await interaction.response.send_message(
-            embed=self.build_status_embed(interaction.guild.id if interaction.guild else None),
+            embed=self.build_status_embed(interaction.guild.id if interaction.guild else None, guild=interaction.guild),
             files=self.brand_files(),
             ephemeral=True,
         )
@@ -329,7 +346,7 @@ class MythicCog(commands.Cog):
             return
         state = self.state.set_system_note(interaction.guild.id, note)
         await interaction.response.send_message(
-            embed=self.build_status_embed(interaction.guild.id, state_override=state),
+            embed=self.build_status_embed(interaction.guild.id, state_override=state, guild=interaction.guild),
             files=self.brand_files(),
             ephemeral=True,
         )
@@ -348,35 +365,26 @@ class MythicCog(commands.Cog):
             ephemeral=True,
         )
 
-    @app_commands.command(name='voice_join', description='Join your current voice channel.')
+    @app_commands.command(name='vision_tips', description='Show image analysis tips and best prompt styles.')
+    async def vision_tips(self, interaction: discord.Interaction) -> None:
+        guild_id = interaction.guild.id if interaction.guild else None
+        await interaction.response.send_message(
+            embed=self.build_vision_embed(guild_id),
+            files=self.brand_files(),
+            ephemeral=True,
+        )
+
+    @app_commands.command(name='voice_afk', description='Join your current voice channel in silent AFK mode.')
+    async def voice_afk(self, interaction: discord.Interaction) -> None:
+        await self.handle_voice_afk(interaction)
+
+    @app_commands.command(name='voice_join', description='Alias of voice_afk. Join your current voice channel in silent AFK mode.')
     async def voice_join(self, interaction: discord.Interaction) -> None:
-        await self.handle_voice_join(interaction)
+        await self.handle_voice_afk(interaction)
 
     @app_commands.command(name='voice_leave', description='Leave the current voice channel.')
     async def voice_leave(self, interaction: discord.Interaction) -> None:
         await self.handle_voice_leave(interaction)
-
-    @app_commands.command(name='speak', description='Join your current voice channel and speak text with ElevenLabs.')
-    @app_commands.describe(text='Text for the bot to speak in voice')
-    async def speak(self, interaction: discord.Interaction, text: str) -> None:
-        await self.handle_speak(interaction, text)
-
-
-
-
-    @app_commands.command(name='transcribe', description='Transcribe an attached audio or video file with ElevenLabs.')
-    @app_commands.describe(file='Audio or video attachment to transcribe')
-    async def transcribe(self, interaction: discord.Interaction, file: discord.Attachment) -> None:
-        await interaction.response.defer(thinking=True)
-        try:
-            attachment_context, _ = await self._extract_attachment_context([file])
-            transcript = attachment_context.split('Transcription:\n', 1)[1] if 'Transcription:\n' in attachment_context else attachment_context
-            mode = self.state.get(interaction.guild.id if interaction.guild else None).get('mode', 'normal')
-            embed = transcript_embed(mode, source_name=file.filename, transcript=transcript, language_code=None)
-            apply_branding(embed, has_banner=self.assets.banner_path() is not None, has_avatar=self.assets.avatar_path() is not None)
-            await interaction.followup.send(embed=embed, files=self.brand_files())
-        except Exception as exc:
-            await interaction.followup.send(f'Transcription failed: {exc}', ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:
