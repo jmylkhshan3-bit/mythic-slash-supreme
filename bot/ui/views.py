@@ -28,7 +28,7 @@ class ModeSelect(discord.ui.Select):
         state = self.cog.state.set_mode(self.guild_id, self.values[0])
         self.cog.presence_manager.set_mode(self.values[0])
         await interaction.response.edit_message(
-            embed=self.cog.build_panel_embed(self.guild_id, state_override=state),
+            embed=self.cog.build_panel_embed(self.guild_id, state_override=state, guild=interaction.guild),
             view=ControlCenterView(self.cog, self.guild_id),
             attachments=self.cog.brand_files(),
         )
@@ -50,7 +50,7 @@ class ControlCenterView(discord.ui.View):
     async def toggle_mentions(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         state = self.cog.state.toggle_mention(self.guild_id)
         await interaction.response.edit_message(
-            embed=self.cog.build_panel_embed(self.guild_id, state_override=state),
+            embed=self.cog.build_panel_embed(self.guild_id, state_override=state, guild=interaction.guild),
             view=ControlCenterView(self.cog, self.guild_id),
             attachments=self.cog.brand_files(),
         )
@@ -63,6 +63,18 @@ class ControlCenterView(discord.ui.View):
     async def leave_voice(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await self.cog.handle_voice_leave(interaction)
 
+    @discord.ui.button(label='Music Queue', style=discord.ButtonStyle.primary, emoji='🎵', row=2)
+    async def music_status(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await interaction.response.send_message(
+            embed=self.cog.build_music_embed(self.guild_id, guild=interaction.guild),
+            files=self.cog.brand_files(),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label='Music Stop', style=discord.ButtonStyle.secondary, emoji='⏹️', row=2)
+    async def music_stop(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await self.cog.handle_music_stop(interaction)
+
     @discord.ui.button(label='Vision Tips', style=discord.ButtonStyle.secondary, emoji='🖼️', row=2)
     async def vision_tips(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.send_message(
@@ -71,19 +83,19 @@ class ControlCenterView(discord.ui.View):
             ephemeral=True,
         )
 
-    @discord.ui.button(label='System Note', style=discord.ButtonStyle.secondary, emoji='📝', row=2)
+    @discord.ui.button(label='System Note', style=discord.ButtonStyle.secondary, emoji='📝', row=3)
     async def system_note(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.send_modal(SystemNoteModal(self.cog))
 
-    @discord.ui.button(label='Status', style=discord.ButtonStyle.primary, emoji='📊', row=2)
+    @discord.ui.button(label='Status', style=discord.ButtonStyle.primary, emoji='📊', row=3)
     async def status(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.send_message(
-            embed=self.cog.build_status_embed(self.guild_id),
+            embed=self.cog.build_status_embed(self.guild_id, guild=interaction.guild),
             files=self.cog.brand_files(),
             ephemeral=True,
         )
 
-    @discord.ui.button(label='Gallery', style=discord.ButtonStyle.secondary, emoji='🧩', row=3)
+    @discord.ui.button(label='Gallery', style=discord.ButtonStyle.secondary, emoji='🧩', row=4)
     async def gallery(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.send_message(
             embed=self.cog.build_gallery_embed(self.guild_id),
@@ -91,10 +103,10 @@ class ControlCenterView(discord.ui.View):
             ephemeral=True,
         )
 
-    @discord.ui.button(label='Refresh', style=discord.ButtonStyle.secondary, emoji='🔄', row=3)
+    @discord.ui.button(label='Refresh', style=discord.ButtonStyle.secondary, emoji='🔄', row=4)
     async def refresh(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.edit_message(
-            embed=self.cog.build_panel_embed(self.guild_id),
+            embed=self.cog.build_panel_embed(self.guild_id, guild=interaction.guild),
             view=ControlCenterView(self.cog, self.guild_id),
             attachments=self.cog.brand_files(),
         )
@@ -105,3 +117,4 @@ class InfoLinksView(discord.ui.View):
         super().__init__(timeout=900)
         self.add_item(discord.ui.Button(label='OpenRouter', url='https://openrouter.ai'))
         self.add_item(discord.ui.Button(label='Discord Developer Portal', url='https://discord.com/developers/applications'))
+        self.add_item(discord.ui.Button(label='yt-dlp FAQ', url='https://github.com/yt-dlp/yt-dlp/wiki/FAQ'))

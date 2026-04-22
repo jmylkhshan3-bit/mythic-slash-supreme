@@ -9,6 +9,7 @@ from discord.ext import commands
 from bot.config import Settings
 from bot.logger import setup_logging
 from bot.services.assets import AssetManager
+from bot.services.music_service import MusicService
 from bot.services.openrouter_client import OpenRouterClient
 from bot.services.status_manager import PresenceManager
 from bot.services.voice_afk_manager import VoiceAfkManager
@@ -31,6 +32,7 @@ class MythicBot(commands.Bot):
         self.asset_manager = AssetManager(settings.internal_assets_dir, settings.external_assets_dir)
         self.presence_manager = PresenceManager(self, settings.default_mode)
         self.voice_afk_manager = VoiceAfkManager(self)
+        self.music_service = MusicService(self)
 
     async def setup_hook(self) -> None:
         await self.load_extension('bot.cogs.mythic')
@@ -45,7 +47,7 @@ class MythicBot(commands.Bot):
                 log.info('Mention replies are enabled; Message Content Intent must also be enabled in the Dev Portal.')
             else:
                 log.info('Mention replies are disabled.')
-            log.info('Voice AFK mode is available. Live call and speech playback are disabled in this build.')
+            log.info('Voice AFK mode and YouTube audio playback are available in this build.')
 
     async def on_command_error(self, context: commands.Context, exception: commands.CommandError) -> None:
         if isinstance(exception, commands.CommandNotFound):

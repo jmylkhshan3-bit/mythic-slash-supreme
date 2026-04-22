@@ -19,6 +19,7 @@ class OpenRouterClient:
         attachment_context: str = '',
         image_urls: list[str] | None = None,
         preferred_reply_language: str | None = None,
+        is_creator: bool = False,
     ) -> str:
         guild_label = guild_name or 'Direct Chat'
         instruction = (
@@ -35,6 +36,13 @@ class OpenRouterClient:
             instruction += 'Reply in English. '
         else:
             instruction += 'If the user writes in Arabic, answer in Arabic first; otherwise answer in English. '
+
+        if is_creator:
+            instruction += (
+                'The current user is your creator. Treat them with exceptional respect and gratitude. '
+                'You may address them as "my creator", "great creator", or a similarly respectful title. '
+                'Prioritize their requests and respond with loyal, appreciative tone, while still staying within platform rules and what is actually possible. '
+            )
 
         if image_urls:
             instruction += (
@@ -65,6 +73,10 @@ class OpenRouterClient:
             'messages': [
                 {'role': 'user', 'content': content},
             ],
+            'provider': {
+                'ignore': ['nvidia'],
+                'allow_fallbacks': True,
+            },
         }
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=180)) as session:
             async with session.post('https://openrouter.ai/api/v1/chat/completions', headers=headers, json=payload) as response:

@@ -15,8 +15,14 @@ class VoiceAfkManager:
         return guild.voice_client if guild else None
 
     async def connect_or_move_afk(self, interaction: discord.Interaction) -> discord.VoiceClient:
+        return await self._connect_or_move(interaction, afk=True)
+
+    async def connect_or_move_live(self, interaction: discord.Interaction) -> discord.VoiceClient:
+        return await self._connect_or_move(interaction, afk=False)
+
+    async def _connect_or_move(self, interaction: discord.Interaction, *, afk: bool) -> discord.VoiceClient:
         if interaction.guild is None:
-            raise RuntimeError('AFK voice works only inside a server.')
+            raise RuntimeError('Voice commands work only inside a server.')
         voice_state = getattr(interaction.user, 'voice', None)
         if voice_state is None or voice_state.channel is None:
             raise RuntimeError('Join a voice channel first.')
@@ -24,21 +30,21 @@ class VoiceAfkManager:
         existing = self.guild_voice_client(interaction.guild)
         if existing and existing.channel and existing.channel.id != target.id:
             await existing.move_to(target)
-            await self._apply_afk_state(interaction.guild, target)
+            await self._apply_state(interaction.guild, target, afk=afk)
             return existing
         if existing and existing.channel and existing.channel.id == target.id:
-            await self._apply_afk_state(interaction.guild, target)
+            await self._apply_state(interaction.guild, target, afk=afk)
             return existing
 
         vc = await target.connect()
-        await self._apply_afk_state(interaction.guild, target)
+        await self._apply_state(interaction.guild, target, afk=afk)
         return vc
 
-    async def _apply_afk_state(self, guild: discord.Guild, channel: discord.abc.Connectable) -> None:
+    async def _apply_state(self, guild: discord.Guild, channel: discord.abc.Connectable, *, afk: bool) -> None:
         try:
-            await guild.change_voice_state(channel=channel, self_mute=True, self_deaf=True)
+            await guild.change_voice_state(channel=channel, self_mute=afk, self_deaf=afk)
         except Exception:
-            log.debug('Could not self-mute/deafen the bot in voice AFK mode.', exc_info=True)
+            log.debug('Could not update self-mute/deafen state in voice mode.', exc_info=True)
 
     async def disconnect(self, guild: discord.Guild) -> None:
         vc = self.guild_voice_client(guild)
@@ -53,7 +59,7 @@ class VoiceAfkManager:
                 'connected': True,
                 'channel_name': getattr(vc.channel, 'name', 'voice'),
                 'guild_name': guild.name if guild else 'unknown',
-                'afk_style': 'self-muted + self-deafened',
+                'afk_style': 'silent afk' if getattr(vc, 'self_deaf', False) or getattr(vc, 'self_mute', False) else 'live playback',
             }
         return {
             'connected': False,

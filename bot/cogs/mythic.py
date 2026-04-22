@@ -16,6 +16,7 @@ from bot.ui.embeds import (
     help_embed,
     info_embed,
     loading_embed,
+    music_embed,
     panel_embed,
     response_embed,
     status_embed,
@@ -36,6 +37,7 @@ class MythicCog(commands.Cog):
         self.assets = bot.asset_manager
         self.presence_manager = bot.presence_manager
         self.voice_afk = bot.voice_afk_manager
+        self.music = bot.music_service
 
     def brand_files(self) -> list[discord.File]:
         files: list[discord.File] = []
@@ -47,8 +49,14 @@ class MythicCog(commands.Cog):
             files.append(avatar)
         return files
 
+    def _is_creator(self, user_id: int | None) -> bool:
+        return self.bot.settings.is_creator(user_id)
+
     def _voice_snapshot(self, guild: discord.Guild | None) -> dict[str, object]:
         return self.voice_afk.snapshot(guild)
+
+    def _music_snapshot(self, guild: discord.Guild | None) -> dict[str, object]:
+        return self.music.snapshot(guild)
 
     def build_status_embed(self, guild_id: int | None, state_override: dict | None = None, guild: discord.Guild | None = None) -> discord.Embed:
         snapshot = state_override or self.state.get(guild_id)
@@ -58,16 +66,24 @@ class MythicCog(commands.Cog):
             self.assets.asset_status(),
             self.bot.settings.openrouter_model,
             self._voice_snapshot(guild),
+            self._music_snapshot(guild),
+            bool(self.bot.settings.creator_ids),
         )
         return apply_branding(embed, has_banner=self.assets.banner_path() is not None, has_avatar=self.assets.avatar_path() is not None)
 
     def build_panel_embed(self, guild_id: int, state_override: dict | None = None, guild: discord.Guild | None = None) -> discord.Embed:
         snapshot = state_override or self.state.get(guild_id)
-        embed = panel_embed(snapshot, snapshot.get('mode', 'normal'), self._voice_snapshot(guild))
+        embed = panel_embed(
+            snapshot,
+            snapshot.get('mode', 'normal'),
+            self._voice_snapshot(guild),
+            self._music_snapshot(guild),
+            bool(self.bot.settings.creator_ids),
+        )
         return apply_branding(embed, has_banner=self.assets.banner_path() is not None, has_avatar=self.assets.avatar_path() is not None)
 
     def build_info_embed(self, mode: str) -> discord.Embed:
-        embed = info_embed(mode, self.bot.settings.openrouter_model, len(self.assets.icon_names()))
+        embed = info_embed(mode, self.bot.settings.openrouter_model, len(self.assets.icon_names()), bool(self.bot.settings.creator_ids))
         return apply_branding(embed, has_banner=self.assets.banner_path() is not None, has_avatar=self.assets.avatar_path() is not None)
 
     def build_gallery_embed(self, guild_id: int | None) -> discord.Embed:
@@ -78,6 +94,19 @@ class MythicCog(commands.Cog):
     def build_vision_embed(self, guild_id: int | None) -> discord.Embed:
         mode = self.state.get(guild_id).get('mode', 'normal')
         embed = vision_embed(mode)
+        return apply_branding(embed, has_banner=self.assets.banner_path() is not None, has_avatar=self.assets.avatar_path() is not None)
+
+    def build_music_embed(self, guild_id: int | None, guild: discord.Guild | None = None) -> discord.Embed:
+        mode = self.state.get(guild_id).get('mode', 'normal')
+        snap = self._music_snapshot(guild)
+        details = (
+            f"Now Playing: `{snap.get('current_title') or 'none'}`\n"
+            f"Connected Voice: `{snap.get('channel_name') or 'none'}`\n"
+            f"Queue Length: `{snap.get('queue_length', 0)}`\n"
+            f"Loop: `{'ON' if snap.get('loop_enabled') else 'OFF'}`\n"
+            'Use `/music` with a YouTube URL or raw video ID.'
+        )
+        embed = music_embed(mode, 'Music Queue', details)
         return apply_branding(embed, has_banner=self.assets.banner_path() is not None, has_avatar=self.assets.avatar_path() is not None)
 
     async def _send_setup_panel(self, interaction: discord.Interaction) -> None:
@@ -102,10 +131,14 @@ class MythicCog(commands.Cog):
         system_note: str,
         attachment_context: str = '',
         image_urls: list[str] | None = None,
+        is_creator: bool = False,
     ) -> None:
         preset = MODE_PRESETS.get(mode, MODE_PRESETS['normal'])
         files = self.brand_files()
-        loading_message = await send_callback(embed=loading_embed(mode, random.choice(preset.loading_lines), prompt, user_name), files=files)
+        loading_message = await send_callback(
+            embed=loading_embed(mode, random.choice(preset.loading_lines), prompt, user_name, is_creator=is_creator),
+            files=files,
+        )
         try:
             answer = await self.ai.chat(
                 prompt=prompt,
@@ -115,11 +148,12 @@ class MythicCog(commands.Cog):
                 system_note=system_note,
                 attachment_context=attachment_context,
                 image_urls=image_urls or [],
+                is_creator=is_creator,
             )
         except Exception as exc:
             log.exception('AI request failed')
             answer = f'AI request failed: {exc}'
-        final_embed = response_embed(mode, prompt, answer, user_name)
+        final_embed = response_embed(mode, prompt, answer, user_name, is_creator=is_creator)
         apply_branding(final_embed, has_banner=self.assets.banner_path() is not None, has_avatar=self.assets.avatar_path() is not None)
         await edit_callback(loading_message, embed=final_embed, attachments=self.brand_files())
 
@@ -132,6 +166,7 @@ class MythicCog(commands.Cog):
         image_urls: list[str] | None = None,
     ) -> None:
         chosen_mode = mode or self.state.get(interaction.guild.id if interaction.guild else None).get('mode', 'normal')
+        is_creator = self._is_creator(interaction.user.id)
         if not interaction.response.is_done():
             await interaction.response.defer(thinking=True)
         await self.animate_response(
@@ -144,6 +179,7 @@ class MythicCog(commands.Cog):
             system_note=self.state.get(interaction.guild.id if interaction.guild else None).get('system_note', ''),
             attachment_context=attachment_context,
             image_urls=image_urls or [],
+            is_creator=is_creator,
         )
 
     async def _extract_attachment_context(self, attachments: list[discord.Attachment]) -> tuple[str, list[str]]:
@@ -210,6 +246,22 @@ class MythicCog(commands.Cog):
             log.exception('Voice AFK join failed')
             await interaction.followup.send(f'Voice AFK join failed: {exc}', ephemeral=True)
 
+    async def handle_voice_join(self, interaction: discord.Interaction) -> None:
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            vc = await self.voice_afk.connect_or_move_live(interaction)
+            channel_name = getattr(vc.channel, 'name', 'voice') if getattr(vc, 'channel', None) else 'voice'
+            await interaction.followup.send(
+                f'Joined **{channel_name}** for live playback commands.',
+                embed=self.build_status_embed(interaction.guild.id if interaction.guild else None, guild=interaction.guild),
+                files=self.brand_files(),
+                ephemeral=True,
+            )
+        except Exception as exc:
+            log.exception('Voice join failed')
+            await interaction.followup.send(f'Voice join failed: {exc}', ephemeral=True)
+
     async def handle_voice_leave(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
             await interaction.response.send_message('This command works only inside a server.', ephemeral=True)
@@ -223,11 +275,25 @@ class MythicCog(commands.Cog):
             log.exception('Voice leave failed')
             await interaction.followup.send(f'Voice leave failed: {exc}', ephemeral=True)
 
+    async def handle_music_stop(self, interaction: discord.Interaction) -> None:
+        if interaction.guild is None:
+            await interaction.response.send_message('This command works only inside a server.', ephemeral=True)
+            return
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            await self.music.stop(interaction.guild)
+            await interaction.followup.send('Stopped playback and cleared the queue.', ephemeral=True)
+        except Exception as exc:
+            log.exception('Music stop failed')
+            await interaction.followup.send(f'Music stop failed: {exc}', ephemeral=True)
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
         if message.author.bot or self.bot.user is None:
             return
 
+        author_is_creator = self._is_creator(message.author.id)
         is_dm = message.guild is None
         if is_dm:
             if not self.bot.settings.enable_mention_reply:
@@ -238,10 +304,10 @@ class MythicCog(commands.Cog):
             if self.bot.user not in message.mentions or message.mention_everyone:
                 return
             snapshot = self.state.get(message.guild.id)
-            if not snapshot.get('mention_enabled', True):
+            if not author_is_creator and not snapshot.get('mention_enabled', True):
                 return
             allowed = snapshot.get('allowed_channel_ids', [])
-            if allowed and message.channel.id not in allowed:
+            if not author_is_creator and allowed and message.channel.id not in allowed:
                 return
             prompt = message.content.replace(self.bot.user.mention, '').strip()
 
@@ -265,6 +331,7 @@ class MythicCog(commands.Cog):
                 system_note=snapshot.get('system_note', ''),
                 attachment_context=attachment_context,
                 image_urls=image_urls,
+                is_creator=author_is_creator,
             )
 
     @app_commands.command(name='ask', description='Ask the AI with optional file or image context.')
@@ -334,9 +401,17 @@ class MythicCog(commands.Cog):
     @app_commands.command(name='help', description='Show the slash command deck.')
     async def help(self, interaction: discord.Interaction) -> None:
         mode = self.state.get(interaction.guild.id if interaction.guild else None).get('mode', 'normal')
-        embed = help_embed(mode)
+        embed = help_embed(mode, creator_configured=bool(self.bot.settings.creator_ids))
         apply_branding(embed, has_banner=self.assets.banner_path() is not None, has_avatar=self.assets.avatar_path() is not None)
         await interaction.response.send_message(embed=embed, files=self.brand_files(), ephemeral=True)
+
+    @app_commands.command(name='creator', description='Show whether you are recognized as the creator.')
+    async def creator(self, interaction: discord.Interaction) -> None:
+        if self._is_creator(interaction.user.id):
+            message = 'Creator verified. Supreme creator privileges are active for your Discord ID.'
+        else:
+            message = 'You are not configured as the creator in this build.'
+        await interaction.response.send_message(message, ephemeral=True)
 
     @app_commands.command(name='systemnote', description='Set or clear the server system note.')
     @app_commands.describe(note='Leave empty to clear the note')
@@ -378,13 +453,75 @@ class MythicCog(commands.Cog):
     async def voice_afk(self, interaction: discord.Interaction) -> None:
         await self.handle_voice_afk(interaction)
 
-    @app_commands.command(name='voice_join', description='Alias of voice_afk. Join your current voice channel in silent AFK mode.')
+    @app_commands.command(name='voice_join', description='Join your current voice channel for live playback commands.')
     async def voice_join(self, interaction: discord.Interaction) -> None:
-        await self.handle_voice_afk(interaction)
+        await self.handle_voice_join(interaction)
 
     @app_commands.command(name='voice_leave', description='Leave the current voice channel.')
     async def voice_leave(self, interaction: discord.Interaction) -> None:
         await self.handle_voice_leave(interaction)
+
+    @app_commands.command(name='music', description='Play direct YouTube audio from a URL or video ID.')
+    @app_commands.describe(url='YouTube URL or raw 11-character video ID')
+    async def music_command(self, interaction: discord.Interaction, url: str) -> None:
+        if interaction.guild is None:
+            await interaction.response.send_message('This command works only inside a server.', ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            track, position, started = await self.music.enqueue(interaction, url)
+            status_line = 'Playback started.' if started else f'Queued at position {position}.'
+            details = (
+                f"Title: **{track.title}**\n"
+                f"URL: {track.webpage_url}\n"
+                f"Requested by: {interaction.user.display_name}\n\n"
+                f"{status_line}"
+            )
+            await interaction.followup.send(
+                embed=apply_branding(
+                    music_embed(self.state.get(interaction.guild.id).get('mode', 'normal'), 'YouTube Playback', details),
+                    has_banner=self.assets.banner_path() is not None,
+                    has_avatar=self.assets.avatar_path() is not None,
+                ),
+                files=self.brand_files(),
+                ephemeral=True,
+            )
+        except Exception as exc:
+            log.exception('Music failed')
+            hint = ''
+            if "Sign in to confirm you're not a bot" in str(exc) or 'cookies' in str(exc).lower():
+                hint = '\nTip: set YTDLP_COOKIES_B64 and YTDLP_USER_AGENT in Railway if YouTube blocks extraction.'
+            await interaction.followup.send(f'Music failed: {exc}{hint}', ephemeral=True)
+
+    @app_commands.command(name='music_skip', description='Skip the current track.')
+    async def music_skip(self, interaction: discord.Interaction) -> None:
+        if interaction.guild is None:
+            await interaction.response.send_message('This command works only inside a server.', ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            title = await self.music.skip(interaction.guild)
+            await interaction.followup.send(f'Skipped: **{title}**', ephemeral=True)
+        except Exception as exc:
+            log.exception('Music skip failed')
+            await interaction.followup.send(f'Music skip failed: {exc}', ephemeral=True)
+
+    @app_commands.command(name='music_stop', description='Stop playback and clear the queue.')
+    async def music_stop(self, interaction: discord.Interaction) -> None:
+        await self.handle_music_stop(interaction)
+
+    @app_commands.command(name='music_loop', description='Toggle loop mode for the current queue.')
+    async def music_loop(self, interaction: discord.Interaction) -> None:
+        if interaction.guild is None:
+            await interaction.response.send_message('This command works only inside a server.', ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            enabled = await self.music.toggle_loop(interaction.guild)
+            await interaction.followup.send(f'Loop is now **{"ON" if enabled else "OFF"}**.', ephemeral=True)
+        except Exception as exc:
+            log.exception('Music loop failed')
+            await interaction.followup.send(f'Music loop failed: {exc}', ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:
