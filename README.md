@@ -1,4 +1,4 @@
-# Mythic Slash Supreme — Creator Build
+# Mythic Slash Supreme — Vision + AFK + YouTube Audio Build
 
 Discord AI bot with:
 - slash dashboard and restored mention replies
@@ -6,7 +6,6 @@ Discord AI bot with:
 - stronger image analysis for screenshots, UI, photos, and multi-image prompts
 - AFK voice mode so the bot can sit silently inside a voice channel
 - direct YouTube audio playback from URL or raw video ID
-- creator recognition by Discord ID with elevated respect and creator-only bypass for mention/channel restrictions
 
 ## Main commands
 - `/ask`
@@ -21,33 +20,16 @@ Discord AI bot with:
 - `/music_skip`
 - `/music_stop`
 - `/music_loop`
-- `/creator`
 - `/gallery`
 - `/vision_tips`
 
-## Creator mode
-Set your Discord ID in:
-- `CREATOR_IDS`
-- or `CREATOR_ID`
+## Mention flow
+Mention the bot in a server or send a DM. Attach images, text files, logs, code files, or zip files if needed.
 
-When the creator talks to the bot:
-- the bot recognizes them by Discord ID
-- replies with elevated respect such as "my creator"
-- bypasses mention disable and channel lock checks
-- prioritizes creator requests within what Discord and the APIs can actually do
-
-## Quick start
-1. Copy `.env.example` to `.env`
-2. Fill your Discord token and OpenRouter key
-3. Put your Discord user ID in `CREATOR_IDS`
-4. Install deps: `pip install -r requirements.txt`
-5. Run: `python main.py`
-
-## Railway notes
-- Start command: `python main.py`
-- `nixpacks.toml` already installs `ffmpeg`
-- Enable Message Content Intent in Discord Developer Portal if you want mention replies
-- Voice and music need Connect + Speak permission in the target voice channel
+## Voice flow
+1. Join a voice channel.
+2. Use `/voice_join` for live playback or `/voice_afk` for silent presence.
+3. Use `/music` with a YouTube URL or raw video ID.
 
 ## Music notes
 - This build uses `yt-dlp` + `ffmpeg`
@@ -55,3 +37,19 @@ When the creator talks to the bot:
 - If YouTube blocks extraction, set:
   - `YTDLP_COOKIES_B64`
   - `YTDLP_USER_AGENT`
+
+## Quick start
+1. Copy `.env.example` to `.env`
+2. Fill your Discord token and OpenRouter key
+3. Install deps: `pip install -r requirements.txt`
+4. Run: `python main.py`
+
+## Railway notes
+- Start command: `python main.py`
+- `nixpacks.toml` already installs `ffmpeg`
+- Enable Message Content Intent in Discord Developer Portal if you want mention replies
+- Voice and music need Connect + Speak permission in the target voice channel
+
+## Important
+- YouTube playback is best-effort. Some videos may require cookies because of YouTube anti-bot checks.
+- AI replies now ignore the Nvidia provider inside OpenRouter routing to reduce provider-side 404s.
