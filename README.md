@@ -53,3 +53,5 @@ Mention the bot in a server or send a DM. Attach images, text files, logs, code 
 ## Important
 - YouTube playback is best-effort. Some videos may require cookies because of YouTube anti-bot checks.
 - AI replies now ignore the Nvidia provider inside OpenRouter routing to reduce provider-side 404s.
+
+- If Railway still cannot find ffmpeg, add `RAILPACK_DEPLOY_APT_PACKAGES=ffmpeg` and `FFMPEG_PATH=ffmpeg` in Variables.

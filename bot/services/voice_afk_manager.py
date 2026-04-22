@@ -46,11 +46,12 @@ class VoiceAfkManager:
         except Exception:
             log.debug('Could not update self-mute/deafen state in voice mode.', exc_info=True)
 
-    async def disconnect(self, guild: discord.Guild) -> None:
+    async def disconnect(self, guild: discord.Guild) -> bool:
         vc = self.guild_voice_client(guild)
         if vc is None:
-            raise RuntimeError('Bot is not in a voice channel.')
+            return False
         await vc.disconnect(force=True)
+        return True
 
     def snapshot(self, guild: discord.Guild | None) -> dict[str, object]:
         vc = self.guild_voice_client(guild)

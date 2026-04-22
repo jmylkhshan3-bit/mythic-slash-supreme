@@ -251,12 +251,12 @@ class MythicCog(commands.Cog):
             return
         if not interaction.response.is_done():
             await interaction.response.defer(ephemeral=True, thinking=True)
-        try:
-            await self.voice_afk.disconnect(interaction.guild)
+
+        left = await self.voice_afk.disconnect(interaction.guild)
+        if left:
             await interaction.followup.send('Left the voice channel.', ephemeral=True)
-        except Exception as exc:
-            log.exception('Voice leave failed')
-            await interaction.followup.send(f'Voice leave failed: {exc}', ephemeral=True)
+        else:
+            await interaction.followup.send('Bot is not in a voice channel.', ephemeral=True)
 
     async def handle_music_stop(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
@@ -436,7 +436,7 @@ class MythicCog(commands.Cog):
 
     @app_commands.command(name='music', description='Play direct YouTube audio from a URL or video ID.')
     @app_commands.describe(url='YouTube URL or raw 11-character video ID')
-    async def music(self, interaction: discord.Interaction, url: str) -> None:
+    async def music_command(self, interaction: discord.Interaction, url: str) -> None:
         if interaction.guild is None:
             await interaction.response.send_message('This command works only inside a server.', ephemeral=True)
             return
@@ -460,11 +460,13 @@ class MythicCog(commands.Cog):
                 ephemeral=True,
             )
         except Exception as exc:
-            log.exception('Music failed')
+            message = str(exc)
             hint = ''
-            if 'Sign in to confirm you\'re not a bot' in str(exc) or 'cookies' in str(exc).lower():
-                hint = '\nTip: set YTDLP_COOKIES_B64 and YTDLP_USER_AGENT in Railway if YouTube blocks extraction.'
-            await interaction.followup.send(f'Music failed: {exc}{hint}', ephemeral=True)
+            lowered = message.lower()
+            if 'sign in to confirm' in lowered or 'cookies' in lowered or 'blocked the server-side extractor' in lowered:
+                hint = '\nTip: add YTDLP_COOKIES_B64 and YTDLP_USER_AGENT in Railway if YouTube blocks extraction.'
+            log.warning('Music failed: %s', message)
+            await interaction.followup.send(f'Music failed: {message}{hint}', ephemeral=True)
 
     @app_commands.command(name='music_skip', description='Skip the current track.')
     async def music_skip(self, interaction: discord.Interaction) -> None:
