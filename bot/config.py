@@ -7,6 +7,21 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
+def _parse_creator_ids() -> set[int]:
+    raw_parts: list[str] = []
+    creator_ids = os.getenv('CREATOR_IDS', '').strip()
+    creator_id = os.getenv('CREATOR_ID', '').strip()
+    if creator_ids:
+        raw_parts.extend(part.strip() for part in creator_ids.replace(';', ',').split(','))
+    if creator_id:
+        raw_parts.append(creator_id)
+    ids: set[int] = set()
+    for part in raw_parts:
+        if part.isdigit():
+            ids.add(int(part))
+    return ids
+
+
 @dataclass(slots=True)
 class Settings:
     discord_token: str
@@ -17,6 +32,8 @@ class Settings:
     default_mode: str
     log_level: str
     enable_mention_reply: bool
+    creator_ids: set[int]
+    creator_title: str
 
     @classmethod
     def load(cls) -> 'Settings':
@@ -34,4 +51,6 @@ class Settings:
             default_mode=os.getenv('DEFAULT_MODE', 'normal').strip().lower(),
             log_level=os.getenv('LOG_LEVEL', 'INFO').strip().upper(),
             enable_mention_reply=os.getenv('ENABLE_MENTION_REPLY', 'true').strip().lower() in {'1', 'true', 'yes', 'on'},
+            creator_ids=_parse_creator_ids(),
+            creator_title=os.getenv('CREATOR_TITLE', 'the Supreme Creator').strip() or 'the Supreme Creator',
         )

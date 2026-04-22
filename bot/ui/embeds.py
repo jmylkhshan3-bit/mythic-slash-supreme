@@ -146,6 +146,7 @@ def help_embed(mode: str) -> discord.Embed:
     embed.add_field(name='/ask', value='Ask the AI with optional attachment or image context.', inline=True)
     embed.add_field(name='/vision', value='Analyze one to three images in more detail.', inline=True)
     embed.add_field(name='/setup', value='Open the main control dashboard.', inline=True)
+    embed.add_field(name='/creator', value='Check whether the bot recognizes you as the Supreme Creator.', inline=True)
     embed.add_field(name='/panel', value='Open the dashboard again.', inline=True)
     embed.add_field(name='/status', value='Inspect runtime state and asset health.', inline=True)
     embed.add_field(name='/voice_afk', value='Join your current voice channel in silent AFK mode.', inline=True)

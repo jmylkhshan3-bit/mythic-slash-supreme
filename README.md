@@ -74,3 +74,24 @@ YTDLP_USER_AGENT=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (K
 ```
 
 The bot will read the base64 text from that file, decode it at runtime, and pass the resulting cookies to `yt-dlp`.
+
+
+## Creator mode
+You can register one or more Discord user IDs as the project creator:
+
+```env
+CREATOR_IDS=123456789012345678,987654321098765432
+CREATOR_TITLE=the Supreme Creator
+```
+
+Or use a single ID:
+
+```env
+CREATOR_ID=123456789012345678
+```
+
+When the creator talks to the bot:
+- creator recognition becomes active
+- creator phrasing becomes more respectful
+- creator mention replies bypass channel locks and mention toggles
+- the bot avoids moralizing or lecturing the creator's tone

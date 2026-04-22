@@ -39,6 +39,19 @@ class MythicCog(commands.Cog):
         self.voice_afk = bot.voice_afk_manager
         self.music = bot.music_service
 
+    def is_creator(self, user: discord.abc.User | None) -> bool:
+        return bool(user and getattr(user, 'id', 0) in self.bot.settings.creator_ids)
+
+    def creator_display_name(self, user: discord.abc.User) -> str:
+        if self.is_creator(user):
+            return f"{user.display_name} • {self.bot.settings.creator_title}"
+        return user.display_name
+
+    def creator_note_suffix(self, user: discord.abc.User | None) -> str:
+        if self.is_creator(user):
+            return f"Creator profile active: {self.bot.settings.creator_title}."
+        return ''
+
     def brand_files(self) -> list[discord.File]:
         files: list[discord.File] = []
         banner = self.assets.banner_file()
@@ -121,6 +134,7 @@ class MythicCog(commands.Cog):
         system_note: str,
         attachment_context: str = '',
         image_urls: list[str] | None = None,
+        is_creator: bool = False,
     ) -> None:
         preset = MODE_PRESETS.get(mode, MODE_PRESETS['normal'])
         files = self.brand_files()
@@ -134,6 +148,8 @@ class MythicCog(commands.Cog):
                 system_note=system_note,
                 attachment_context=attachment_context,
                 image_urls=image_urls or [],
+                is_creator=is_creator,
+                creator_title=self.bot.settings.creator_title,
             )
         except Exception as exc:
             log.exception('AI request failed')
@@ -151,6 +167,7 @@ class MythicCog(commands.Cog):
         image_urls: list[str] | None = None,
     ) -> None:
         chosen_mode = mode or self.state.get(interaction.guild.id if interaction.guild else None).get('mode', 'normal')
+        is_creator = self.is_creator(interaction.user)
         if not interaction.response.is_done():
             await interaction.response.defer(thinking=True)
         await self.animate_response(
@@ -158,11 +175,12 @@ class MythicCog(commands.Cog):
             edit_callback=lambda msg, **kwargs: msg.edit(**kwargs),
             prompt=prompt,
             mode=chosen_mode,
-            user_name=interaction.user.display_name,
+            user_name=self.creator_display_name(interaction.user),
             guild_name=interaction.guild.name if interaction.guild else None,
-            system_note=self.state.get(interaction.guild.id if interaction.guild else None).get('system_note', ''),
+            system_note=(self.state.get(interaction.guild.id if interaction.guild else None).get('system_note', '') + ' ' + self.creator_note_suffix(interaction.user)).strip(),
             attachment_context=attachment_context,
             image_urls=image_urls or [],
+            is_creator=is_creator,
         )
 
     async def _extract_attachment_context(self, attachments: list[discord.Attachment]) -> tuple[str, list[str]]:
@@ -277,8 +295,9 @@ class MythicCog(commands.Cog):
             return
 
         is_dm = message.guild is None
+        creator_mode = self.is_creator(message.author)
         if is_dm:
-            if not self.bot.settings.enable_mention_reply:
+            if not self.bot.settings.enable_mention_reply and not creator_mode:
                 return
             snapshot = self.state.get(None)
             prompt = message.content.strip()
@@ -286,10 +305,10 @@ class MythicCog(commands.Cog):
             if self.bot.user not in message.mentions or message.mention_everyone:
                 return
             snapshot = self.state.get(message.guild.id)
-            if not snapshot.get('mention_enabled', True):
+            if not creator_mode and not snapshot.get('mention_enabled', True):
                 return
             allowed = snapshot.get('allowed_channel_ids', [])
-            if allowed and message.channel.id not in allowed:
+            if not creator_mode and allowed and message.channel.id not in allowed:
                 return
             prompt = message.content.replace(self.bot.user.mention, '').strip()
 
@@ -308,11 +327,12 @@ class MythicCog(commands.Cog):
                 edit_callback=lambda msg, **kwargs: msg.edit(**kwargs),
                 prompt=prompt,
                 mode=snapshot.get('mode', 'normal'),
-                user_name=message.author.display_name,
+                user_name=self.creator_display_name(message.author),
                 guild_name=message.guild.name if message.guild else None,
-                system_note=snapshot.get('system_note', ''),
+                system_note=(snapshot.get('system_note', '') + ' ' + self.creator_note_suffix(message.author)).strip(),
                 attachment_context=attachment_context,
                 image_urls=image_urls,
+                is_creator=creator_mode,
             )
 
     @app_commands.command(name='ask', description='Ask the AI with optional file or image context.')
@@ -353,6 +373,19 @@ class MythicCog(commands.Cog):
             embed=self.build_status_embed(interaction.guild.id, state_override=state, guild=interaction.guild),
             files=self.brand_files(),
         )
+
+    @app_commands.command(name='creator', description='Show creator recognition status.')
+    async def creator(self, interaction: discord.Interaction) -> None:
+        if self.is_creator(interaction.user):
+            await interaction.response.send_message(
+                f"You are recognized as **{self.bot.settings.creator_title}**. Creator routing, creator wording, and creator priority are active.",
+                ephemeral=True,
+            )
+        else:
+            await interaction.response.send_message(
+                'You are not registered in CREATOR_IDS / CREATOR_ID.',
+                ephemeral=True,
+            )
 
     @app_commands.command(name='setup', description='Open the legendary slash dashboard.')
     async def setup(self, interaction: discord.Interaction) -> None:
@@ -447,7 +480,7 @@ class MythicCog(commands.Cog):
             details = (
                 f"Title: **{track.title}**\n"
                 f"URL: {track.webpage_url}\n"
-                f"Requested by: {interaction.user.display_name}\n\n"
+                f"Requested by: {self.creator_display_name(interaction.user)}\n\n"
                 f"{status_line}"
             )
             await interaction.followup.send(

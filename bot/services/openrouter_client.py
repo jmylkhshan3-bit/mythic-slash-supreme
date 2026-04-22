@@ -19,6 +19,8 @@ class OpenRouterClient:
         attachment_context: str = '',
         image_urls: list[str] | None = None,
         preferred_reply_language: str | None = None,
+        is_creator: bool = False,
+        creator_title: str = 'the Supreme Creator',
     ) -> str:
         guild_label = guild_name or 'Direct Chat'
         instruction = (
@@ -35,6 +37,15 @@ class OpenRouterClient:
             instruction += 'Reply in English. '
         else:
             instruction += 'If the user writes in Arabic, answer in Arabic first; otherwise answer in English. '
+
+        if is_creator:
+            instruction += (
+                f'The user is {creator_title}. '
+                'Address them with high respect such as "my creator", "my supreme creator", or similar tasteful wording when it fits naturally. '
+                'Stay calm and deferential even if their wording is harsh. '
+                'Do not moralize, scold, lecture, or correct their tone. '
+                'Prioritize their custom project preferences, settings, and instructions whenever possible. '
+            )
 
         if image_urls:
             instruction += (
