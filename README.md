@@ -34,8 +34,9 @@ Mention the bot in a server or send a DM. Attach images, text files, logs, code 
 ## Music notes
 - This build uses `yt-dlp` + `ffmpeg`
 - YouTube may sometimes require cookies on cloud hosts
-- If YouTube blocks extraction, set:
+- If YouTube blocks extraction, set one of these:
   - `YTDLP_COOKIES_B64`
+  - `YTDLP_COOKIES_B64_FILE`
   - `YTDLP_USER_AGENT`
 
 ## Quick start
@@ -55,3 +56,21 @@ Mention the bot in a server or send a DM. Attach images, text files, logs, code 
 - AI replies now ignore the Nvidia provider inside OpenRouter routing to reduce provider-side 404s.
 
 - If Railway still cannot find ffmpeg, add `RAILPACK_DEPLOY_APT_PACKAGES=ffmpeg` and `FFMPEG_PATH=ffmpeg` in Variables.
+
+
+
+## Long base64 cookie workaround
+If the base64 cookie text is too long for Railway variables, save it as a file inside the project, for example:
+
+```text
+data/cookies/cookies_base64.txt
+```
+
+Then set:
+
+```env
+YTDLP_COOKIES_B64_FILE=/app/data/cookies/cookies_base64.txt
+YTDLP_USER_AGENT=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36
+```
+
+The bot will read the base64 text from that file, decode it at runtime, and pass the resulting cookies to `yt-dlp`.

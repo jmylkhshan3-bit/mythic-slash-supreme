@@ -60,14 +60,26 @@ class MusicService:
             "loop_enabled": state.loop_enabled,
         }
 
+
     def _resolve_cookie_file(self) -> str | None:
         cookie_file = os.getenv("YTDLP_COOKIE_FILE", "").strip()
         if cookie_file and Path(cookie_file).exists():
             return cookie_file
 
+        b64_file = os.getenv("YTDLP_COOKIES_B64_FILE", "").strip()
         b64 = os.getenv("YTDLP_COOKIES_B64", "").strip()
         raw = os.getenv("YTDLP_COOKIES", "")
         content = ""
+
+        if b64_file:
+            try:
+                file_path = Path(b64_file)
+                if file_path.exists():
+                    b64 = file_path.read_text(encoding="utf-8", errors="ignore").strip()
+                else:
+                    log.warning("YTDLP_COOKIES_B64_FILE does not exist: %s", b64_file)
+            except Exception:
+                log.exception("Failed to read YTDLP_COOKIES_B64_FILE")
 
         if b64:
             try:
